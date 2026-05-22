@@ -154,7 +154,7 @@
     transition: color 0.15s ease;
     display: inline;
   }
-  .word-display .letter.correct { color: var(--correct); }
+  .word-display .letter.correct { color: var(--ink); }
   .word-display .letter.error {
     color: var(--error);
     animation: shake 0.3s ease;
@@ -438,10 +438,204 @@
     justify-content: flex-end;
   }
 
+  /* --- Racer panel --- */
+  .racer-mode-select {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 12px 30px -20px rgba(42, 34, 24, 0.25);
+  }
+  .racer-title {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 1.8rem;
+    font-weight: 400;
+    margin-bottom: 0.4rem;
+  }
+  .racer-subtitle {
+    font-size: 1rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    letter-spacing: 0.05em;
+    margin-bottom: 2rem;
+  }
+  .racer-mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  .mode-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.4rem 1.2rem;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--ink);
+    transition: all 0.2s ease;
+  }
+  .mode-card:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--paper);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -12px rgba(42,34,24,0.25);
+  }
+  .mode-card:disabled { opacity: 0.4; cursor: not-allowed; }
+  .mode-card .mode-name {
+    font-size: 1.3rem;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.02em;
+  }
+  .mode-card .mode-desc {
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    line-height: 1.4;
+  }
+  .racer-empty-hint {
+    margin-top: 1.4rem;
+    font-style: italic;
+    color: var(--ink-faint);
+    font-size: 0.95rem;
+  }
+
+  .racer-stage {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem 2rem 1.8rem;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 12px 30px -20px rgba(42, 34, 24, 0.25);
+    position: relative;
+  }
+  .racer-stats {
+    display: flex;
+    justify-content: center;
+    gap: 2.5rem;
+    margin-bottom: 1.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-wrap: wrap;
+  }
+  .r-stat .val {
+    color: var(--ink);
+    margin-left: 0.4em;
+    font-weight: 600;
+  }
+
+  .racer-words-viewport {
+    overflow: hidden;
+    padding: 0.5rem 0;
+    margin-bottom: 1.4rem;
+    border-top: 1px solid var(--bg-deep);
+    border-bottom: 1px solid var(--bg-deep);
+    height: calc(3rem * 1.6 * 2 + 1rem);
+  }
+  .racer-words-inner {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 3rem;
+    line-height: 1.6;
+    direction: rtl;
+    text-align: right;
+    transition: transform 0.35s ease;
+    padding: 0 0.4rem;
+  }
+  .r-word {
+    display: inline-block;
+    padding: 0 0.32em;
+    margin: 0;
+    color: var(--pending);
+    white-space: nowrap;
+    border-radius: 3px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .r-word.active {
+    background: rgba(139, 58, 31, 0.08);
+    color: var(--pending);
+  }
+  .r-word.done { color: var(--ink); }
+  .r-letter { transition: color 0.15s ease; }
+  .r-word.active .r-letter { color: var(--pending); }
+  .r-word.active .r-letter.correct { color: var(--ink); }
+  .r-word.active .r-letter.error {
+    color: var(--error);
+    animation: shake 0.3s ease;
+  }
+
+  .racer-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .racer-result {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 12px 30px -20px rgba(42, 34, 24, 0.25);
+  }
+  .result-icon {
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .result-title {
+    font-family: 'Noto Naskh Arabic', serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    margin-bottom: 1.8rem;
+  }
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    max-width: 620px;
+    margin: 0 auto 2rem;
+  }
+  .result-stat .big {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.4rem;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .result-stat .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .result-actions {
+    display: flex;
+    gap: 0.8rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
   @media (max-width: 600px) {
     .word-display { font-size: 3.5rem; }
     .add-form { grid-template-columns: 1fr; }
     h1 { font-size: 1.8rem; }
+    .racer-mode-grid { grid-template-columns: 1fr; }
+    .result-grid { grid-template-columns: repeat(2, 1fr); }
+    .racer-words-inner { font-size: 2.2rem; }
+    .racer-words-viewport { height: calc(2.2rem * 1.6 * 2 + 1rem); }
+    .racer-stats { gap: 1.2rem; }
   }
 </style>
 </head>
@@ -456,6 +650,7 @@
   <nav class="tabs">
     <button class="tab active" data-tab="practice">Practice</button>
     <button class="tab" data-tab="words">Word List</button>
+    <button class="tab" data-tab="racer">Racer</button>
   </nav>
 
   <!-- PRACTICE PANEL -->
@@ -493,6 +688,68 @@
         <div class="shortcut-hint">
           <kbd>⌘</kbd> <kbd>K</kbd> toggle hint &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>→</kbd> next
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RACER PANEL -->
+  <section class="panel" id="racer-panel">
+    <div class="racer-mode-select" id="racer-mode-select">
+      <h2 class="racer-title">Typing Racer</h2>
+      <p class="racer-subtitle">choose a mode</p>
+      <div class="racer-mode-grid">
+        <button class="mode-card" data-mode="all">
+          <div class="mode-name">All Words</div>
+          <div class="mode-desc">type every word in your list, in random order. no timer.</div>
+        </button>
+        <button class="mode-card" data-mode="timed">
+          <div class="mode-name">One Minute</div>
+          <div class="mode-desc">60 seconds. random words from your list (repeats allowed). get a final WPM.</div>
+        </button>
+      </div>
+      <div class="racer-empty-hint" id="racer-empty-hint" style="display:none">add some words to your list first →</div>
+    </div>
+
+    <div class="racer-stage" id="racer-stage" style="display:none">
+      <span class="stage-corner tl"></span>
+      <span class="stage-corner tr"></span>
+      <span class="stage-corner bl"></span>
+      <span class="stage-corner br"></span>
+
+      <div class="racer-stats">
+        <div class="r-stat"><span class="label">time</span><span class="val" id="r-time">—</span></div>
+        <div class="r-stat"><span class="label">wpm</span><span class="val" id="r-wpm">0</span></div>
+        <div class="r-stat"><span class="label">words</span><span class="val" id="r-words-done">0</span></div>
+        <div class="r-stat"><span class="label">errors</span><span class="val" id="r-errors">0</span></div>
+      </div>
+
+      <div class="racer-words-viewport" id="r-viewport">
+        <div class="racer-words-inner" id="r-words-inner"></div>
+      </div>
+
+      <input type="text" class="hidden-input" id="racer-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="input-area">
+        <label for="racer-input" class="input-hint" id="racer-input-hint">click here, then start typing the top line</label>
+      </div>
+
+      <div class="racer-controls">
+        <button class="btn subtle" id="r-back">← change mode</button>
+        <button class="btn subtle" id="r-restart">restart</button>
+      </div>
+    </div>
+
+    <div class="racer-result" id="racer-result" style="display:none">
+      <div class="result-icon">◆</div>
+      <h2 class="result-title" id="r-result-title">Run complete</h2>
+      <div class="result-grid">
+        <div class="result-stat"><div class="big" id="r-final-wpm">0</div><div class="label">WPM</div></div>
+        <div class="result-stat"><div class="big" id="r-final-acc">0%</div><div class="label">accuracy</div></div>
+        <div class="result-stat"><div class="big" id="r-final-words">0</div><div class="label">words</div></div>
+        <div class="result-stat"><div class="big" id="r-final-time">0s</div><div class="label">time</div></div>
+      </div>
+      <div class="result-actions">
+        <button class="btn primary" id="r-again">try again</button>
+        <button class="btn subtle" id="r-result-back">← change mode</button>
       </div>
     </div>
   </section>
@@ -644,16 +901,29 @@ function saveSettings() {
 /* ========== TABS ========== */
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
+    // Leaving racer mid-race? Stop its timer.
+    if (racerState && racerState.timer) {
+      clearInterval(racerState.timer);
+      racerState.timer = null;
+    }
+
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(tab.dataset.tab + '-panel').classList.add('active');
+
     if (tab.dataset.tab === 'practice') {
       renderWord();
       setTimeout(() => document.getElementById('typing-input').focus(), 50);
-    } else {
+    } else if (tab.dataset.tab === 'words') {
       renderList();
+    } else if (tab.dataset.tab === 'racer') {
+      racerState = null;
+      showRacerScreen('mode');
+      updateRacerModeAvailability();
     }
+    updateOverlayVisibility();
+    updateHighlight();
   });
 });
 
@@ -782,23 +1052,49 @@ const overlay = document.getElementById('keyboard-overlay');
 const highlight = document.getElementById('key-highlight');
 const kbImg = document.getElementById('kb-img');
 
+function isRacerStageActive() {
+  const racerPanel = document.getElementById('racer-panel');
+  return racerPanel.classList.contains('active') &&
+         document.getElementById('racer-stage').style.display !== 'none';
+}
+
+function updateOverlayVisibility() {
+  const shouldShow = hintVisible && (isPracticeActive() || isRacerStageActive());
+  overlay.classList.toggle('visible', shouldShow);
+}
+
 function setHintVisible(v) {
   hintVisible = v;
   settings.hintVisible = v;
   saveSettings();
-  overlay.classList.toggle('visible', v);
+  updateOverlayVisibility();
   hintStatusEl.textContent = v ? 'on' : 'off';
   if (v) updateHighlight();
 }
 
-function updateHighlight() {
-  if (!hintVisible || words.length === 0) { hideHighlight(); return; }
-  const word = words[currentIdx];
-  if (!word) { hideHighlight(); return; }
-  const target = splitArabicWord(word.arabic);
-  if (typedCount >= target.length) { hideHighlight(); return; }
+function getNextHintChar() {
+  if (isPracticeActive()) {
+    if (words.length === 0) return null;
+    const word = words[currentIdx];
+    if (!word) return null;
+    const target = splitArabicWord(word.arabic);
+    if (typedCount >= target.length) return null;
+    return target[typedCount];
+  }
+  if (isRacerStageActive() && racerState && !racerState.finished) {
+    const w = racerState.stream[racerState.currentWordIdx];
+    if (!w) return null;
+    const target = splitArabicWord(w.arabic);
+    if (racerState.currentLetterCount >= target.length) return null;
+    return target[racerState.currentLetterCount];
+  }
+  return null;
+}
 
-  const nextChar = target[typedCount];
+function updateHighlight() {
+  if (!hintVisible) { hideHighlight(); return; }
+  const nextChar = getNextHintChar();
+  if (!nextChar) { hideHighlight(); return; }
   const pos = KEY_POSITIONS[nextChar];
   if (!pos) { hideHighlight(); return; }
 
@@ -841,13 +1137,20 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 });
 
 /* ========== KEYBOARD SHORTCUTS ========== */
+function isPracticeActive() {
+  return document.getElementById('practice-panel').classList.contains('active');
+}
 document.addEventListener('keydown', (e) => {
-  // Cmd/Ctrl + K → toggle hint
+  // Cmd/Ctrl + K → toggle hint (available on Practice and during a Racer run)
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    if (!isPracticeActive() && !isRacerStageActive()) return;
     e.preventDefault();
     setHintVisible(!hintVisible);
     toast(hintVisible ? 'keyboard hint on' : 'keyboard hint off');
+    return;
   }
+
+  if (!isPracticeActive()) return;
   // Cmd/Ctrl + ArrowRight → next word
   if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowRight') {
     e.preventDefault();
@@ -977,6 +1280,280 @@ document.getElementById('import-file').addEventListener('change', (e) => {
   };
   reader.readAsText(file);
   e.target.value = '';
+});
+
+/* ========== RACER ========== */
+const racerModeSelect = document.getElementById('racer-mode-select');
+const racerStage = document.getElementById('racer-stage');
+const racerResult = document.getElementById('racer-result');
+const racerInput = document.getElementById('racer-input');
+const racerWordsInner = document.getElementById('r-words-inner');
+const racerInputHint = document.getElementById('racer-input-hint');
+const racerEmptyHint = document.getElementById('racer-empty-hint');
+const rTimeEl = document.getElementById('r-time');
+const rWpmEl = document.getElementById('r-wpm');
+const rWordsDoneEl = document.getElementById('r-words-done');
+const rErrorsEl = document.getElementById('r-errors');
+
+let racerState = null;
+
+function shuffleArray(arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function showRacerScreen(which) {
+  racerModeSelect.style.display = which === 'mode' ? 'block' : 'none';
+  racerStage.style.display = which === 'stage' ? 'block' : 'none';
+  racerResult.style.display = which === 'result' ? 'block' : 'none';
+  updateOverlayVisibility();
+  if (which === 'stage') updateHighlight(); else hideHighlight();
+}
+
+function updateRacerModeAvailability() {
+  const empty = words.length === 0;
+  document.querySelectorAll('.mode-card').forEach(c => { c.disabled = empty; });
+  racerEmptyHint.style.display = empty ? 'block' : 'none';
+}
+
+function buildWordHtml(w, wi) {
+  const letters = splitArabicWord(w.arabic);
+  const letterHtml = letters.map(ch =>
+    `<span class="r-letter">${escapeHtml(ch)}</span>`
+  ).join('');
+  return `<span class="r-word" data-w="${wi}">${letterHtml}</span>`;
+}
+
+function renderRacerStream() {
+  racerWordsInner.innerHTML = racerState.stream.map((w, wi) => buildWordHtml(w, wi)).join('');
+  highlightActiveWord();
+}
+
+function appendRacerWord(w) {
+  const wi = racerState.stream.length;
+  racerState.stream.push(w);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = buildWordHtml(w, wi);
+  racerWordsInner.appendChild(tmp.firstChild);
+}
+
+function ensureWordsAhead() {
+  if (racerState.mode !== 'timed') return;
+  while (racerState.stream.length - racerState.currentWordIdx < 30) {
+    appendRacerWord(words[Math.floor(Math.random() * words.length)]);
+  }
+}
+
+function highlightActiveWord() {
+  const wordEls = racerWordsInner.querySelectorAll('.r-word');
+  wordEls.forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i < racerState.currentWordIdx) el.classList.add('done');
+    else if (i === racerState.currentWordIdx) el.classList.add('active');
+  });
+}
+
+function resetRacerScroll() {
+  racerWordsInner.style.transition = 'none';
+  racerWordsInner.style.transform = 'translateY(0)';
+  void racerWordsInner.offsetHeight;
+  racerWordsInner.style.transition = 'transform 0.35s ease';
+}
+
+function adjustRacerScroll() {
+  const wordEls = racerWordsInner.querySelectorAll('.r-word');
+  if (wordEls.length === 0) return;
+  const currentEl = wordEls[racerState.currentWordIdx];
+  if (!currentEl) return;
+  const baseTop = wordEls[0].offsetTop;
+  const lineH = currentEl.offsetHeight;
+  if (lineH === 0) return;
+  const lineIdx = Math.round((currentEl.offsetTop - baseTop) / lineH);
+  const shift = lineIdx > 0 ? -lineIdx * lineH : 0;
+  racerWordsInner.style.transform = `translateY(${shift}px)`;
+}
+
+function startRacer(mode) {
+  if (words.length === 0) { toast('add some words first'); return; }
+
+  if (racerState && racerState.timer) clearInterval(racerState.timer);
+
+  racerState = {
+    mode,
+    stream: [],
+    currentWordIdx: 0,
+    currentLetterCount: 0,
+    errors: 0,
+    correctChars: 0,
+    startTime: null,
+    elapsed: 0,
+    timer: null,
+    finished: false,
+    timeLimit: 60
+  };
+
+  if (mode === 'all') {
+    racerState.stream = shuffleArray(words);
+  } else {
+    for (let i = 0; i < 60; i++) {
+      racerState.stream.push(words[Math.floor(Math.random() * words.length)]);
+    }
+  }
+
+  showRacerScreen('stage');
+  renderRacerStream();
+  resetRacerScroll();
+  rTimeEl.textContent = mode === 'timed' ? racerState.timeLimit + 's' : '0s';
+  rWpmEl.textContent = '0';
+  rWordsDoneEl.textContent = '0';
+  rErrorsEl.textContent = '0';
+  racerInput.value = '';
+  setTimeout(() => racerInput.focus(), 50);
+}
+
+function startRacerTimerIfNeeded() {
+  if (!racerState || racerState.startTime !== null) return;
+  racerState.startTime = Date.now();
+  racerState.timer = setInterval(racerTick, 100);
+}
+
+function racerTick() {
+  if (!racerState || racerState.finished) return;
+  racerState.elapsed = (Date.now() - racerState.startTime) / 1000;
+  if (racerState.mode === 'timed') {
+    const remaining = Math.max(0, racerState.timeLimit - racerState.elapsed);
+    rTimeEl.textContent = Math.ceil(remaining) + 's';
+    if (remaining <= 0) { finishRacer(); return; }
+  } else {
+    rTimeEl.textContent = Math.floor(racerState.elapsed) + 's';
+  }
+  updateLiveWpm();
+}
+
+function updateLiveWpm() {
+  const minutes = (racerState.elapsed || 0) / 60;
+  const wpm = minutes > 0 ? Math.round(racerState.currentWordIdx / minutes) : 0;
+  rWpmEl.textContent = isFinite(wpm) ? wpm : 0;
+  rWordsDoneEl.textContent = racerState.currentWordIdx;
+  rErrorsEl.textContent = racerState.errors;
+}
+
+racerInput.addEventListener('focus', () => racerInputHint.classList.add('focused'));
+racerInput.addEventListener('blur',  () => racerInputHint.classList.remove('focused'));
+racerInputHint.addEventListener('click', () => racerInput.focus());
+
+racerInput.addEventListener('input', () => {
+  if (!racerState || racerState.finished) return;
+  if (racerState.currentWordIdx >= racerState.stream.length) return;
+
+  startRacerTimerIfNeeded();
+
+  const word = racerState.stream[racerState.currentWordIdx];
+  const target = splitArabicWord(word.arabic);
+  const typed = splitArabicWord(racerInput.value);
+
+  const currentWordEl = racerWordsInner.querySelector(`.r-word[data-w="${racerState.currentWordIdx}"]`);
+  if (!currentWordEl) return;
+  const letterEls = currentWordEl.querySelectorAll('.r-letter');
+  letterEls.forEach(el => el.classList.remove('correct', 'error'));
+
+  let correctSoFar = 0;
+  let hadError = false;
+  for (let i = 0; i < typed.length && i < target.length; i++) {
+    if (typed[i] === target[i]) {
+      letterEls[i] && letterEls[i].classList.add('correct');
+      correctSoFar++;
+    } else {
+      letterEls[i] && letterEls[i].classList.add('error');
+      hadError = true;
+      break;
+    }
+  }
+
+  if (hadError) {
+    racerState.errors++;
+    const goodTyped = target.slice(0, correctSoFar).join('');
+    racerInput.value = goodTyped;
+    racerState.currentLetterCount = correctSoFar;
+    letterEls.forEach((el, i) => {
+      el.classList.remove('error');
+      if (i < correctSoFar) el.classList.add('correct');
+    });
+    updateLiveWpm();
+    updateHighlight();
+    return;
+  }
+
+  racerState.currentLetterCount = typed.length;
+
+  if (racerState.currentLetterCount === target.length) {
+    racerState.correctChars += target.length;
+    racerState.currentWordIdx++;
+    racerState.currentLetterCount = 0;
+    racerInput.value = '';
+
+    if (racerState.mode === 'all' && racerState.currentWordIdx >= racerState.stream.length) {
+      finishRacer();
+      return;
+    }
+    ensureWordsAhead();
+    highlightActiveWord();
+    adjustRacerScroll();
+    updateLiveWpm();
+  }
+  updateHighlight();
+});
+
+function finishRacer() {
+  if (!racerState || racerState.finished) return;
+  racerState.finished = true;
+  if (racerState.timer) { clearInterval(racerState.timer); racerState.timer = null; }
+
+  const elapsed = racerState.startTime ? (Date.now() - racerState.startTime) / 1000 : 0;
+  const usedTime = racerState.mode === 'timed' ? Math.min(racerState.timeLimit, elapsed) : elapsed;
+  const minutes = usedTime / 60;
+  const wordsDone = racerState.currentWordIdx;
+  const wpm = minutes > 0 ? Math.round(wordsDone / minutes) : 0;
+  const totalAttempts = racerState.correctChars + racerState.errors;
+  const acc = totalAttempts > 0 ? Math.round((racerState.correctChars / totalAttempts) * 100) : 100;
+
+  document.getElementById('r-final-wpm').textContent = wpm;
+  document.getElementById('r-final-acc').textContent = acc + '%';
+  document.getElementById('r-final-words').textContent = wordsDone;
+  document.getElementById('r-final-time').textContent = Math.round(usedTime) + 's';
+  document.getElementById('r-result-title').textContent =
+    racerState.mode === 'timed' ? 'Time up!' : 'List complete';
+
+  showRacerScreen('result');
+}
+
+document.querySelectorAll('.mode-card').forEach(card => {
+  card.addEventListener('click', () => startRacer(card.dataset.mode));
+});
+document.getElementById('r-restart').addEventListener('click', () => {
+  if (racerState) startRacer(racerState.mode);
+});
+document.getElementById('r-back').addEventListener('click', () => {
+  if (racerState && racerState.timer) clearInterval(racerState.timer);
+  racerState = null;
+  showRacerScreen('mode');
+  updateRacerModeAvailability();
+});
+document.getElementById('r-again').addEventListener('click', () => {
+  if (racerState) startRacer(racerState.mode);
+});
+document.getElementById('r-result-back').addEventListener('click', () => {
+  racerState = null;
+  showRacerScreen('mode');
+  updateRacerModeAvailability();
+});
+
+window.addEventListener('resize', () => {
+  if (racerState && !racerState.finished) adjustRacerScroll();
 });
 
 /* ========== TOAST ========== */
