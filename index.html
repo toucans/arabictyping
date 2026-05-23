@@ -1119,8 +1119,8 @@ function newCollectionId() {
 
 function normalizeCollections(raw) {
   if (Array.isArray(raw)) {
-    // Legacy: a flat array of word items.
-    return [{ id: 'default', name: 'Words', items: raw }];
+    // Legacy local: flat array of words (oldest-first) → reverse to newest-first.
+    return [{ id: 'default', name: 'Words', items: raw.slice().reverse() }];
   }
   if (raw && Array.isArray(raw.collections)) {
     const seen = new Set();
@@ -1133,11 +1133,20 @@ function normalizeCollections(raw) {
       out.push({
         id,
         name: String(c.name || 'Untitled'),
-        items: Array.isArray(c.items) ? c.items : [],
+        items: Array.isArray(c.items) ? c.items.slice() : [],
       });
     });
+    // One-time migration: if the source predates the newest-first convention,
+    // reverse each collection's items so old chronological data shows newest at the top.
+    if (!raw.sortedNewestFirst) {
+      out.forEach(c => c.items.reverse());
+    }
     if (out.length === 0) out.push({ id: 'default', name: 'Words', items: [] });
     return out;
+  }
+  if (raw && Array.isArray(raw.words)) {
+    // Legacy remote shape ({ words, lastModified }) — oldest-first → reverse.
+    return [{ id: 'default', name: 'Words', items: raw.words.slice().reverse() }];
   }
   return [{ id: 'default', name: 'Words', items: [] }];
 }
@@ -1164,7 +1173,7 @@ function refreshActiveCollection() {
 
 let suppressWordlistPush = false;
 function saveCollections() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections, sortedNewestFirst: true })); } catch (e) {}
   if (!suppressWordlistPush) scheduleWordlistPush();
 }
 
@@ -1655,7 +1664,7 @@ function addWord() {
   const ar = newArabicInput.value.trim();
   const tr = newTranslitInput.value.trim();
   if (!ar) { newArabicInput.focus(); return; }
-  words.push({ arabic: ar, translit: tr });
+  words.unshift({ arabic: ar, translit: tr });
   saveWords();
   newArabicInput.value = '';
   newTranslitInput.value = '';
@@ -1666,7 +1675,7 @@ function addWord() {
 
 document.getElementById('load-sample').addEventListener('click', () => {
   if (words.length > 0 && !confirm('Append sample words to your existing list?')) return;
-  words.push(...SAMPLE_WORDS);
+  words.unshift(...SAMPLE_WORDS);
   saveWords();
   renderList();
   toast('sample words added');
@@ -2120,7 +2129,7 @@ async function runWordlistPush() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${settings.uploadPassword}`,
       },
-      body: JSON.stringify({ collections, lastModified: wordlistLastModified }),
+      body: JSON.stringify({ collections, sortedNewestFirst: true, lastModified: wordlistLastModified }),
     });
     if (res.status === 409) {
       const data = await res.json().catch(() => ({}));
