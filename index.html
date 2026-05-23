@@ -819,6 +819,7 @@
           <button class="btn subtle" id="prev-btn">← previous</button>
           <button class="btn subtle" id="skip-btn">skip →</button>
           <button class="btn subtle" id="reset-btn">restart</button>
+          <button class="btn subtle" id="translit-toggle">translation: off</button>
         </div>
         <div class="shortcut-hint">
           <kbd>⌘</kbd> <kbd>K</kbd> hint &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>R</kbd> replay audio &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>→</kbd> next
@@ -1055,7 +1056,7 @@ function saveWords() {
   if (!suppressWordlistPush) scheduleWordlistPush();
 }
 function loadSettings() {
-  const defaults = { hintVisible: false, autoplay: false, uploadPassword: '' };
+  const defaults = { hintVisible: false, autoplay: false, uploadPassword: '', showTranslit: false };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return Object.assign({}, defaults, JSON.parse(raw));
@@ -1125,14 +1126,13 @@ function renderWord() {
   wordDisplay.innerHTML = letters.map((ch, i) =>
     `<span class="letter" data-i="${i}">${ch}</span>`
   ).join('');
-  translitEl.textContent = word.translit || '';
+  translitEl.textContent = settings.showTranslit ? (word.translit || '') : '';
   wordIdxEl.textContent = `${currentIdx + 1} / ${words.length}`;
   errorCountEl.textContent = errorCount;
 
   typedCount = 0;
   typingInput.value = '';
   updateHighlight();
-  playAudioIfEnabled(word);
 }
 
 function splitArabicWord(str) {
@@ -1209,6 +1209,7 @@ function onWordComplete() {
     if (currentIdx < words.length - 1) {
       currentIdx++;
       renderWord();
+      playAudioIfEnabled(words[currentIdx]);
     } else {
       // finished the list
       wordDisplay.innerHTML = '<div class="completion-banner"><div class="check">◆</div><p>list complete — restart to practice again</p></div>';
@@ -1292,20 +1293,36 @@ document.getElementById('prev-btn').addEventListener('click', () => {
   if (words.length === 0) return;
   currentIdx = (currentIdx - 1 + words.length) % words.length;
   renderWord();
+  playAudioIfEnabled(words[currentIdx]);
   typingInput.focus();
 });
 document.getElementById('skip-btn').addEventListener('click', () => {
   if (words.length === 0) return;
   currentIdx = (currentIdx + 1) % words.length;
   renderWord();
+  playAudioIfEnabled(words[currentIdx]);
   typingInput.focus();
 });
 document.getElementById('reset-btn').addEventListener('click', () => {
   currentIdx = 0;
   errorCount = 0;
   renderWord();
+  playAudioIfEnabled(words[currentIdx]);
   typingInput.focus();
 });
+
+const translitToggleBtn = document.getElementById('translit-toggle');
+function refreshTranslitToggleLabel() {
+  translitToggleBtn.textContent = `translation: ${settings.showTranslit ? 'on' : 'off'}`;
+}
+translitToggleBtn.addEventListener('click', () => {
+  settings.showTranslit = !settings.showTranslit;
+  saveSettings();
+  refreshTranslitToggleLabel();
+  renderWord();
+  typingInput.focus();
+});
+refreshTranslitToggleLabel();
 
 /* ========== KEYBOARD SHORTCUTS ========== */
 function isPracticeActive() {
