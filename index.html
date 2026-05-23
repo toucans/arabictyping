@@ -1118,37 +1118,24 @@ function newCollectionId() {
 }
 
 function normalizeCollections(raw) {
-  if (Array.isArray(raw)) {
-    // Legacy local: flat array of words (oldest-first) → reverse to newest-first.
-    return [{ id: 'default', name: 'Words', items: raw.slice().reverse() }];
+  if (!raw || !Array.isArray(raw.collections)) {
+    return [{ id: 'default', name: 'Words', items: [] }];
   }
-  if (raw && Array.isArray(raw.collections)) {
-    const seen = new Set();
-    const out = [];
-    raw.collections.forEach(c => {
-      if (!c) return;
-      let id = String(c.id || newCollectionId());
-      while (seen.has(id)) id = newCollectionId();
-      seen.add(id);
-      out.push({
-        id,
-        name: String(c.name || 'Untitled'),
-        items: Array.isArray(c.items) ? c.items.slice() : [],
-      });
+  const seen = new Set();
+  const out = [];
+  raw.collections.forEach(c => {
+    if (!c) return;
+    let id = String(c.id || newCollectionId());
+    while (seen.has(id)) id = newCollectionId();
+    seen.add(id);
+    out.push({
+      id,
+      name: String(c.name || 'Untitled'),
+      items: Array.isArray(c.items) ? c.items.slice() : [],
     });
-    // One-time migration: if the source predates the newest-first convention,
-    // reverse each collection's items so old chronological data shows newest at the top.
-    if (!raw.sortedNewestFirst) {
-      out.forEach(c => c.items.reverse());
-    }
-    if (out.length === 0) out.push({ id: 'default', name: 'Words', items: [] });
-    return out;
-  }
-  if (raw && Array.isArray(raw.words)) {
-    // Legacy remote shape ({ words, lastModified }) — oldest-first → reverse.
-    return [{ id: 'default', name: 'Words', items: raw.words.slice().reverse() }];
-  }
-  return [{ id: 'default', name: 'Words', items: [] }];
+  });
+  if (out.length === 0) out.push({ id: 'default', name: 'Words', items: [] });
+  return out;
 }
 
 function loadCollections() {
@@ -1173,25 +1160,15 @@ function refreshActiveCollection() {
 
 let suppressWordlistPush = false;
 function saveCollections() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections, sortedNewestFirst: true })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections })); } catch (e) {}
   if (!suppressWordlistPush) scheduleWordlistPush();
 }
 
-// Backwards-compatible alias — existing word ops just mutate `words` (the active
-// collection's items array) and call saveWords() to persist + push.
-function saveWords() { saveCollections(); }
 function loadSettings() {
   const defaults = { hintVisible: false, autoplay: 'off', uploadPassword: '', showTranslit: false, activeCollectionId: null };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // Migrate boolean autoplay → string tri-state.
-      if (parsed.autoplay === true)  parsed.autoplay = 'advanced';
-      if (parsed.autoplay === false) parsed.autoplay = 'off';
-      if (!['off','advanced','completed'].includes(parsed.autoplay)) parsed.autoplay = 'off';
-      return Object.assign({}, defaults, parsed);
-    }
+    if (raw) return Object.assign({}, defaults, JSON.parse(raw));
   } catch (e) {}
   return defaults;
 }
@@ -1652,7 +1629,7 @@ wordListEl.addEventListener('click', (e) => {
   } else if (action === 'down' && idx < words.length - 1) {
     [words[idx+1], words[idx]] = [words[idx], words[idx+1]];
   }
-  saveWords();
+  saveCollections();
   renderList();
 });
 
@@ -1665,7 +1642,7 @@ function addWord() {
   const tr = newTranslitInput.value.trim();
   if (!ar) { newArabicInput.focus(); return; }
   words.unshift({ arabic: ar, translit: tr });
-  saveWords();
+  saveCollections();
   newArabicInput.value = '';
   newTranslitInput.value = '';
   newArabicInput.focus();
@@ -1676,7 +1653,7 @@ function addWord() {
 document.getElementById('load-sample').addEventListener('click', () => {
   if (words.length > 0 && !confirm('Append sample words to your existing list?')) return;
   words.unshift(...SAMPLE_WORDS);
-  saveWords();
+  saveCollections();
   renderList();
   toast('sample words added');
 });
@@ -1684,7 +1661,7 @@ document.getElementById('load-sample').addEventListener('click', () => {
 document.getElementById('clear-all').addEventListener('click', () => {
   if (!confirm('Delete all words? This cannot be undone.')) return;
   words = [];
-  saveWords();
+  saveCollections();
   renderList();
   currentIdx = 0;
   toast('list cleared');
@@ -1716,7 +1693,7 @@ document.getElementById('import-file').addEventListener('change', (e) => {
       if (clean.length === 0) throw new Error('no valid words');
       if (confirm(`Import ${clean.length} words? This will replace your current list.`)) {
         words = clean;
-        saveWords();
+        saveCollections();
         renderList();
         toast(`imported ${clean.length} words`);
       }
@@ -2085,19 +2062,9 @@ async function fetchRemoteWordlist() {
   } catch (e) { return null; }
 }
 
-// Accepts either the new shape ({ collections, lastModified }) or the legacy shape
-// ({ words, lastModified }), normalizes into collections, and replaces local state.
 function setCollectionsFromRemote(data) {
-  if (!data) return false;
-  let next;
-  if (Array.isArray(data.collections)) {
-    next = normalizeCollections({ collections: data.collections });
-  } else if (Array.isArray(data.words)) {
-    next = [{ id: 'default', name: 'Words', items: data.words }];
-  } else {
-    return false;
-  }
-  collections = next;
+  if (!data || !Array.isArray(data.collections)) return false;
+  collections = normalizeCollections({ collections: data.collections });
   wordlistLastModified = data.lastModified || null;
   refreshActiveCollection();
   if (currentIdx >= words.length) currentIdx = 0;
@@ -2129,7 +2096,7 @@ async function runWordlistPush() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${settings.uploadPassword}`,
       },
-      body: JSON.stringify({ collections, sortedNewestFirst: true, lastModified: wordlistLastModified }),
+      body: JSON.stringify({ collections, lastModified: wordlistLastModified }),
     });
     if (res.status === 409) {
       const data = await res.json().catch(() => ({}));
@@ -2172,8 +2139,7 @@ async function loadRemoteWordlistOnInit() {
 
 async function migrateWordlistOnPasswordSet() {
   const remote = await fetchRemoteWordlist();
-  const hasRemote = remote && (Array.isArray(remote.collections) || Array.isArray(remote.words));
-  if (hasRemote) {
+  if (remote && Array.isArray(remote.collections)) {
     if (setCollectionsFromRemote(remote)) {
       renderCollectionsBar();
       renderList();
@@ -2184,7 +2150,7 @@ async function migrateWordlistOnPasswordSet() {
     renderSyncStatus();
     return;
   }
-  // No remote yet — upload current local collections (one-time migration).
+  // No remote yet — upload current local collections.
   const totalLocal = collections.reduce((n, c) => n + c.items.length, 0);
   if (totalLocal > 0) {
     await runWordlistPush();
@@ -2275,7 +2241,7 @@ audioFilePicker.addEventListener('change', async () => {
       }).catch(() => {});
     }
     word.audio = data.filename;
-    saveWords();
+    saveCollections();
     renderList();
     toast('audio uploaded');
   } catch (e) {
@@ -2295,7 +2261,7 @@ async function deleteWordAudio(idx) {
     });
     if (!res.ok) { toast('delete failed'); return; }
     delete word.audio;
-    saveWords();
+    saveCollections();
     renderList();
     toast('audio removed');
   } catch (e) { toast('delete failed'); }
