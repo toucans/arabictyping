@@ -142,16 +142,17 @@ async function handlePostWordlist(request, env, cors) {
   let body;
   try { body = await request.json(); }
   catch (e) { return jsonError('invalid json', 400, cors); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonError('body must be a json object', 400, cors);
+  }
 
-  const { words } = body;
   const clientBase = body.lastModified == null ? null : String(body.lastModified);
-  if (!Array.isArray(words)) return jsonError('words must be an array', 400, cors);
 
   const existing = await env.BUCKET.get(WORDLIST_KEY);
   if (existing) {
     let serverData;
     try { serverData = JSON.parse(await existing.text()); }
-    catch (e) { serverData = { words: [], lastModified: null }; }
+    catch (e) { serverData = { lastModified: null }; }
     const serverLM = serverData.lastModified || null;
     if (clientBase !== serverLM) {
       return jsonResponse(
@@ -163,7 +164,9 @@ async function handlePostWordlist(request, env, cors) {
   }
 
   const newLastModified = new Date().toISOString();
-  const payload = JSON.stringify({ words, lastModified: newLastModified }, null, 2);
+  // Store the body verbatim with a server-issued lastModified.
+  const { lastModified: _ignored, ...rest } = body;
+  const payload = JSON.stringify({ ...rest, lastModified: newLastModified }, null, 2);
   await env.BUCKET.put(WORDLIST_KEY, payload, {
     httpMetadata: { contentType: 'application/json; charset=utf-8' },
   });
