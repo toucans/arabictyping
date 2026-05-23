@@ -17,6 +17,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 const AUDIO_PREFIX = '/audio/';
+const WORDLIST_KEY = 'wordlist.json';
 
 export default {
   async fetch(request, env) {
@@ -46,6 +47,15 @@ export default {
       if (request.method === 'DELETE' && url.pathname.startsWith(AUDIO_PREFIX)) {
         if (!isAuthed(request, env)) return jsonError('unauthorized', 401, cors);
         return await handleDelete(url, env, cors);
+      }
+
+      if (request.method === 'GET' && url.pathname === '/wordlist') {
+        return await handleGetWordlist(env, cors);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/wordlist') {
+        if (!isAuthed(request, env)) return jsonError('unauthorized', 401, cors);
+        return await handlePostWordlist(request, env, cors);
       }
 
       return jsonError('not found', 404, cors);
@@ -97,7 +107,10 @@ async function handleList(env, cors) {
   // R2 list is paginated; loop until exhausted (capped to a reasonable number).
   for (let i = 0; i < 50; i++) {
     const listed = await env.BUCKET.list({ limit: 1000, cursor });
-    for (const o of listed.objects) files.push(o.key);
+    for (const o of listed.objects) {
+      if (o.key === WORDLIST_KEY) continue; // not an audio file
+      files.push(o.key);
+    }
     if (!listed.truncated) break;
     cursor = listed.cursor;
   }
@@ -109,6 +122,52 @@ async function handleDelete(url, env, cors) {
   if (!key) return jsonError('missing key', 400, cors);
   await env.BUCKET.delete(key);
   return jsonResponse({ ok: true, filename: key }, cors);
+}
+
+async function handleGetWordlist(env, cors) {
+  const obj = await env.BUCKET.get(WORDLIST_KEY);
+  if (!obj) return jsonError('not found', 404, cors);
+  const text = await obj.text();
+  const headers = new Headers(cors);
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  headers.set('Cache-Control', 'no-store');
+  return new Response(text, { headers });
+}
+
+async function handlePostWordlist(request, env, cors) {
+  const ct = request.headers.get('Content-Type') || '';
+  if (!ct.toLowerCase().includes('application/json')) {
+    return jsonError('expected application/json', 400, cors);
+  }
+  let body;
+  try { body = await request.json(); }
+  catch (e) { return jsonError('invalid json', 400, cors); }
+
+  const { words } = body;
+  const clientBase = body.lastModified == null ? null : String(body.lastModified);
+  if (!Array.isArray(words)) return jsonError('words must be an array', 400, cors);
+
+  const existing = await env.BUCKET.get(WORDLIST_KEY);
+  if (existing) {
+    let serverData;
+    try { serverData = JSON.parse(await existing.text()); }
+    catch (e) { serverData = { words: [], lastModified: null }; }
+    const serverLM = serverData.lastModified || null;
+    if (clientBase !== serverLM) {
+      return jsonResponse(
+        { ok: false, error: 'conflict', current: serverData },
+        cors,
+        409
+      );
+    }
+  }
+
+  const newLastModified = new Date().toISOString();
+  const payload = JSON.stringify({ words, lastModified: newLastModified }, null, 2);
+  await env.BUCKET.put(WORDLIST_KEY, payload, {
+    httpMetadata: { contentType: 'application/json; charset=utf-8' },
+  });
+  return jsonResponse({ ok: true, lastModified: newLastModified }, cors);
 }
 
 function isAuthed(request, env) {

@@ -28,14 +28,17 @@
   html, body { height: 100%; }
 
   body {
-    background-color: var(--bg);
+    /* The texture is semi-transparent white on transparent background.
+       A lighter tan still gives the white floral enough contrast to read,
+       and the gradient overlay on top mutes the pattern further. */
+    background-color: #dccfb0;
     background-image:
-      linear-gradient(rgba(244, 237, 224, 0.55), rgba(235, 225, 207, 0.65)),
+      linear-gradient(rgba(220, 207, 176, 0.55), rgba(220, 207, 176, 0.55)),
       url('hatoyamakaikanbackground.webp');
-    background-size: cover;
-    background-position: center center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    background-size: cover, cover;
+    background-position: center center, center center;
+    background-attachment: fixed, fixed;
+    background-repeat: no-repeat, no-repeat;
     color: var(--ink);
     font-family: 'Cormorant Garamond', serif;
     min-height: 100vh;
@@ -450,16 +453,57 @@
     color: var(--ink-soft);
     padding: 0.3rem 0;
     list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
   .audio-settings summary::-webkit-details-marker { display: none; }
-  .audio-settings summary::before {
+  .audio-settings .summary-title::before {
     content: '▸ ';
     color: var(--ink-faint);
-    transition: transform 0.15s ease;
-    display: inline-block;
     margin-right: 0.3em;
   }
-  .audio-settings[open] summary::before { content: '▾ '; }
+  .audio-settings[open] .summary-title::before { content: '▾ '; }
+
+  .sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: none;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sync-dot {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    flex-shrink: 0;
+  }
+  .sync-dot[data-status="synced"]  { background: var(--correct); box-shadow: 0 0 6px rgba(61, 94, 31, 0.5); }
+  .sync-dot[data-status="syncing"] { background: var(--hint); animation: sync-pulse 1.2s ease-in-out infinite; }
+  .sync-dot[data-status="error"]   { background: var(--error); }
+  .sync-dot[data-status="viewonly"]{ background: var(--ink-faint); }
+  .sync-dot[data-status="offline"] { background: var(--ink-faint); opacity: 0.5; }
+  @keyframes sync-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .sync-detail {
+    padding: 0.5rem 0.7rem;
+    border-left: 2px solid var(--border);
+    background: rgba(0,0,0,0.025);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    line-height: 1.4;
+  }
   .audio-settings-body {
     padding: 0.7rem 0 0.2rem;
     display: flex;
@@ -854,8 +898,15 @@
       </div>
 
       <details class="audio-settings" id="audio-settings">
-        <summary>audio settings</summary>
+        <summary>
+          <span class="summary-title">sync &amp; audio</span>
+          <span class="sync-badge" id="sync-badge">
+            <span class="sync-dot" id="sync-dot" data-status="offline"></span>
+            <span class="sync-label" id="sync-label">not configured</span>
+          </span>
+        </summary>
         <div class="audio-settings-body">
+          <div class="sync-detail" id="sync-detail"></div>
           <label class="audio-row toggle-row">
             <input type="checkbox" id="autoplay-toggle">
             <span>autoplay audio when advancing to a new word</span>
@@ -998,8 +1049,10 @@ function loadWords() {
   } catch (e) {}
   return [];
 }
+let suppressWordlistPush = false;
 function saveWords() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(words)); } catch (e) {}
+  if (!suppressWordlistPush) scheduleWordlistPush();
 }
 function loadSettings() {
   const defaults = { hintVisible: false, autoplay: false, uploadPassword: '' };
@@ -1708,6 +1761,174 @@ window.addEventListener('resize', () => {
   if (racerState && !racerState.finished) adjustRacerScroll();
 });
 
+/* ========== WORDLIST SYNC ========== */
+let wordlistLastModified = null;
+let wordlistPushTimer = null;
+let wordlistPushInFlight = false;
+let wordlistPushQueued = false;
+let syncErrorMessage = '';
+
+const syncDot = document.getElementById('sync-dot');
+const syncLabel = document.getElementById('sync-label');
+const syncDetail = document.getElementById('sync-detail');
+
+function relativeTime(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return '';
+  const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (sec < 5) return 'just now';
+  if (sec < 60) return sec + 's ago';
+  const min = Math.round(sec / 60);
+  if (min < 60) return min + 'm ago';
+  const hr = Math.round(min / 60);
+  if (hr < 24) return hr + 'h ago';
+  const day = Math.round(hr / 24);
+  if (day < 7) return day + 'd ago';
+  return new Date(iso).toLocaleDateString();
+}
+
+function computeSyncStatus() {
+  if (!audioEnabled()) return 'offline';
+  if (wordlistPushInFlight || wordlistPushTimer) return 'syncing';
+  if (syncErrorMessage) return 'error';
+  if (!settings.uploadPassword) return 'viewonly';
+  return 'synced';
+}
+
+function renderSyncStatus() {
+  const status = computeSyncStatus();
+  syncDot.setAttribute('data-status', status);
+
+  let label = '';
+  if (status === 'offline')  label = 'worker not configured';
+  else if (status === 'syncing') label = 'syncing…';
+  else if (status === 'error')   label = syncErrorMessage || 'error';
+  else if (status === 'viewonly') label = wordlistLastModified ? `read-only · ${relativeTime(wordlistLastModified)}` : 'read-only';
+  else if (status === 'synced')  label = wordlistLastModified ? `synced · ${relativeTime(wordlistLastModified)}` : 'synced';
+  syncLabel.textContent = label;
+
+  let detail = '';
+  if (status === 'offline') {
+    detail = 'WORKER_URL is empty in index.html — set it to enable cloud word list & audio.';
+  } else if (status === 'viewonly') {
+    detail = wordlistLastModified
+      ? `word list loaded from worker (read-only) — last update ${new Date(wordlistLastModified).toLocaleString()}. paste your upload password below to push changes.`
+      : 'paste your upload password below to push word-list changes and upload audio.';
+  } else if (status === 'syncing') {
+    detail = 'pushing latest word list to worker…';
+  } else if (status === 'error') {
+    detail = `last push failed: ${syncErrorMessage}. changes are saved locally and will retry on the next edit.`;
+  } else if (status === 'synced') {
+    detail = wordlistLastModified
+      ? `${words.length} word${words.length === 1 ? '' : 's'} · last update ${new Date(wordlistLastModified).toLocaleString()}`
+      : `${words.length} word${words.length === 1 ? '' : 's'} · not yet pushed to worker`;
+  }
+  syncDetail.textContent = detail;
+}
+
+async function fetchRemoteWordlist() {
+  if (!audioEnabled()) return null;
+  try {
+    const res = await fetch(`${WORKER_URL}/wordlist`, { cache: 'no-store' });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) { return null; }
+}
+
+function setWordsFromRemote(data) {
+  if (!data || !Array.isArray(data.words)) return false;
+  words = data.words;
+  wordlistLastModified = data.lastModified || null;
+  suppressWordlistPush = true;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(words)); } catch (e) {}
+  suppressWordlistPush = false;
+  if (currentIdx >= words.length) currentIdx = 0;
+  return true;
+}
+
+function scheduleWordlistPush() {
+  if (!canUpload()) return;
+  clearTimeout(wordlistPushTimer);
+  wordlistPushTimer = setTimeout(() => {
+    wordlistPushTimer = null;
+    runWordlistPush();
+  }, 600);
+  renderSyncStatus();
+}
+
+async function runWordlistPush() {
+  if (!canUpload()) return;
+  if (wordlistPushInFlight) { wordlistPushQueued = true; renderSyncStatus(); return; }
+  wordlistPushInFlight = true;
+  renderSyncStatus();
+  try {
+    const res = await fetch(`${WORKER_URL}/wordlist`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settings.uploadPassword}`,
+      },
+      body: JSON.stringify({ words, lastModified: wordlistLastModified }),
+    });
+    if (res.status === 409) {
+      const data = await res.json().catch(() => ({}));
+      if (data && data.current && setWordsFromRemote(data.current)) {
+        renderList();
+        renderWord();
+        toast('list was changed elsewhere — reloaded');
+      }
+      syncErrorMessage = '';
+    } else if (res.ok) {
+      const data = await res.json();
+      wordlistLastModified = data.lastModified || null;
+      syncErrorMessage = '';
+    } else if (res.status === 401) {
+      syncErrorMessage = 'password rejected';
+      toast('wordlist push: password rejected');
+    } else {
+      syncErrorMessage = `server error ${res.status}`;
+    }
+  } catch (e) {
+    syncErrorMessage = 'network error';
+  }
+  wordlistPushInFlight = false;
+  renderSyncStatus();
+  if (wordlistPushQueued) {
+    wordlistPushQueued = false;
+    scheduleWordlistPush();
+  }
+}
+
+async function loadRemoteWordlistOnInit() {
+  const remote = await fetchRemoteWordlist();
+  if (!remote || !Array.isArray(remote.words)) { renderSyncStatus(); return; }
+  if (!setWordsFromRemote(remote)) { renderSyncStatus(); return; }
+  renderList();
+  renderWord();
+  renderSyncStatus();
+}
+
+async function migrateWordlistOnPasswordSet() {
+  const remote = await fetchRemoteWordlist();
+  if (remote && Array.isArray(remote.words)) {
+    if (setWordsFromRemote(remote)) {
+      renderList();
+      renderWord();
+      toast(`loaded ${remote.words.length} words from worker`);
+    }
+    renderSyncStatus();
+    return;
+  }
+  // No remote yet — upload current local list (one-time migration).
+  if (words.length > 0) {
+    await runWordlistPush();
+    if (wordlistLastModified) toast(`uploaded ${words.length} words to worker`);
+  }
+  renderSyncStatus();
+}
+
 /* ========== AUDIO ========== */
 const audioFilePicker = document.getElementById('audio-file-picker');
 const autoplayToggle = document.getElementById('autoplay-toggle');
@@ -1849,13 +2070,8 @@ function refreshAudioSettingsUi() {
   autoplayToggle.checked = !!settings.autoplay;
   uploadPasswordInput.value = settings.uploadPassword || '';
   clearPasswordBtn.style.display = settings.uploadPassword ? '' : 'none';
-  if (!audioEnabled()) {
-    audioInfoEl.textContent = 'WORKER_URL is empty — set it in index.html to enable audio.';
-  } else if (!settings.uploadPassword) {
-    audioInfoEl.textContent = 'paste your upload password to enable uploads.';
-  } else {
-    audioInfoEl.textContent = '';
-  }
+  audioInfoEl.textContent = '';
+  renderSyncStatus();
 }
 
 autoplayToggle.addEventListener('change', () => {
@@ -1863,7 +2079,7 @@ autoplayToggle.addEventListener('change', () => {
   saveSettings();
 });
 
-function savePasswordFromInput() {
+async function savePasswordFromInput() {
   const v = uploadPasswordInput.value.trim();
   settings.uploadPassword = v;
   saveSettings();
@@ -1871,6 +2087,7 @@ function savePasswordFromInput() {
   renderList();
   if (v && audioEnabled()) {
     toast('password saved');
+    await migrateWordlistOnPasswordSet();
     syncAudioList();
   } else if (!v) {
     toast('password cleared');
@@ -1905,6 +2122,10 @@ renderWord();
 renderList();
 setHintVisible(hintVisible);
 setTimeout(() => typingInput.focus(), 100);
+refreshAudioSettingsUi();
+loadRemoteWordlistOnInit();
+// Keep the relative-time label fresh.
+setInterval(renderSyncStatus, 30000);
 </script>
 </body>
 </html>
