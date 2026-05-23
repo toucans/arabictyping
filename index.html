@@ -821,7 +821,7 @@
           <button class="btn subtle" id="reset-btn">restart</button>
         </div>
         <div class="shortcut-hint">
-          <kbd>⌘</kbd> <kbd>K</kbd> toggle hint &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>→</kbd> next
+          <kbd>⌘</kbd> <kbd>K</kbd> hint &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>R</kbd> replay audio &nbsp;·&nbsp; <kbd>⌘</kbd> <kbd>→</kbd> next
         </div>
       </div>
     </div>
@@ -1311,6 +1311,14 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 function isPracticeActive() {
   return document.getElementById('practice-panel').classList.contains('active');
 }
+function getCurrentTypingWord() {
+  if (isPracticeActive() && words.length > 0) return words[currentIdx];
+  if (isRacerStageActive() && racerState && !racerState.finished) {
+    return racerState.stream[racerState.currentWordIdx];
+  }
+  return null;
+}
+
 document.addEventListener('keydown', (e) => {
   // Cmd/Ctrl + K → toggle hint (available on Practice and during a Racer run)
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -1318,6 +1326,18 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     setHintVisible(!hintVisible);
     toast(hintVisible ? 'keyboard hint on' : 'keyboard hint off');
+    return;
+  }
+
+  // Cmd/Ctrl + R → replay the current word's audio (always, regardless of autoplay)
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'r') {
+    if (!isPracticeActive() && !isRacerStageActive()) return;
+    const w = getCurrentTypingWord();
+    if (!w) return;
+    e.preventDefault();
+    if (!audioEnabled()) { toast('worker not configured'); return; }
+    if (!w.audio) { toast('no audio for this word'); return; }
+    playWordAudio(w);
     return;
   }
 
