@@ -303,6 +303,48 @@
     50% { box-shadow: 0 0 18px rgba(228, 180, 65, 0.9); }
   }
 
+  /* --- Collection bar --- */
+  .collections-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px dashed var(--border);
+  }
+  .collection-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .collection-pill {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .collection-pill:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .collection-pill.active {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+  }
+  .collection-pill .pill-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    opacity: 0.7;
+    margin-left: 0.4em;
+  }
+  .collection-actions { display: flex; gap: 0.4rem; }
+  .collection-actions .btn { font-size: 0.85rem; padding: 0.35rem 0.7rem; }
+
   /* --- Word list panel --- */
   .list-panel {
     background: var(--paper);
@@ -519,6 +561,18 @@
     flex-wrap: wrap;
   }
   .audio-row.toggle-row { cursor: pointer; }
+  .audio-select {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.3rem 0.5rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.95rem;
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+  }
+  .audio-select:focus { border-color: var(--accent); }
   .audio-row.password-row input {
     flex: 1;
     min-width: 220px;
@@ -898,6 +952,15 @@
         <span class="list-count" id="list-count">0 words</span>
       </div>
 
+      <div class="collections-bar">
+        <div class="collection-pills" id="collection-pills"></div>
+        <div class="collection-actions">
+          <button class="btn subtle" id="new-collection">+ new</button>
+          <button class="btn subtle" id="rename-collection">rename</button>
+          <button class="btn subtle" id="delete-collection">delete</button>
+        </div>
+      </div>
+
       <details class="audio-settings" id="audio-settings">
         <summary>
           <span class="summary-title">sync &amp; audio</span>
@@ -908,9 +971,13 @@
         </summary>
         <div class="audio-settings-body">
           <div class="sync-detail" id="sync-detail"></div>
-          <label class="audio-row toggle-row">
-            <input type="checkbox" id="autoplay-toggle">
-            <span>autoplay audio when advancing to a new word</span>
+          <label class="audio-row toggle-row" for="autoplay-select">
+            <span>autoplay:</span>
+            <select id="autoplay-select" class="audio-select">
+              <option value="off">off</option>
+              <option value="advanced">word you just advanced to</option>
+              <option value="completed">word you just finished typing</option>
+            </select>
           </label>
           <div class="audio-row password-row">
             <input type="password" id="upload-password-input" placeholder="upload password (saved on this device only)">
@@ -1035,31 +1102,87 @@ const SAMPLE_WORDS = [
   { arabic: 'صديق', translit: 'ṣadīq — friend' }
 ];
 
-let words = loadWords();
+let collections = loadCollections();        // [{ id, name, items: [{arabic, translit, audio?}, ...] }]
+let activeCollectionId = null;               // set by refreshActiveCollection()
+let words = [];                              // live alias to the active collection's items
 let settings = loadSettings();
 let currentIdx = 0;
 let typedCount = 0;
 let errorCount = 0;
 let hintVisible = settings.hintVisible || false;
+refreshActiveCollection();                   // sets activeCollectionId and points `words` at the right array
 
 /* ========== STORAGE ========== */
-function loadWords() {
+function newCollectionId() {
+  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function normalizeCollections(raw) {
+  if (Array.isArray(raw)) {
+    // Legacy: a flat array of word items.
+    return [{ id: 'default', name: 'Words', items: raw }];
+  }
+  if (raw && Array.isArray(raw.collections)) {
+    const seen = new Set();
+    const out = [];
+    raw.collections.forEach(c => {
+      if (!c) return;
+      let id = String(c.id || newCollectionId());
+      while (seen.has(id)) id = newCollectionId();
+      seen.add(id);
+      out.push({
+        id,
+        name: String(c.name || 'Untitled'),
+        items: Array.isArray(c.items) ? c.items : [],
+      });
+    });
+    if (out.length === 0) out.push({ id: 'default', name: 'Words', items: [] });
+    return out;
+  }
+  return [{ id: 'default', name: 'Words', items: [] }];
+}
+
+function loadCollections() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return normalizeCollections(JSON.parse(raw));
   } catch (e) {}
-  return [];
+  return [{ id: 'default', name: 'Words', items: [] }];
 }
+
+function getActiveCollection() {
+  return collections.find(c => c.id === activeCollectionId) || null;
+}
+
+function refreshActiveCollection() {
+  let active = collections.find(c => c.id === activeCollectionId);
+  if (!active) active = collections.find(c => c.id === (settings && settings.activeCollectionId));
+  if (!active) active = collections[0];
+  activeCollectionId = active ? active.id : null;
+  words = active ? active.items : [];
+}
+
 let suppressWordlistPush = false;
-function saveWords() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(words)); } catch (e) {}
+function saveCollections() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections })); } catch (e) {}
   if (!suppressWordlistPush) scheduleWordlistPush();
 }
+
+// Backwards-compatible alias — existing word ops just mutate `words` (the active
+// collection's items array) and call saveWords() to persist + push.
+function saveWords() { saveCollections(); }
 function loadSettings() {
-  const defaults = { hintVisible: false, autoplay: false, uploadPassword: '', showTranslit: false };
+  const defaults = { hintVisible: false, autoplay: 'off', uploadPassword: '', showTranslit: false, activeCollectionId: null };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return Object.assign({}, defaults, JSON.parse(raw));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Migrate boolean autoplay → string tri-state.
+      if (parsed.autoplay === true)  parsed.autoplay = 'advanced';
+      if (parsed.autoplay === false) parsed.autoplay = 'off';
+      if (!['off','advanced','completed'].includes(parsed.autoplay)) parsed.autoplay = 'off';
+      return Object.assign({}, defaults, parsed);
+    }
   } catch (e) {}
   return defaults;
 }
@@ -1204,12 +1327,14 @@ typingInput.addEventListener('input', (e) => {
 });
 
 function onWordComplete() {
+  // Play the word that was just finished, if that mode is selected.
+  playCompletedAudio(words[currentIdx]);
   // brief celebration, then advance
   setTimeout(() => {
     if (currentIdx < words.length - 1) {
       currentIdx++;
       renderWord();
-      playAudioIfEnabled(words[currentIdx]);
+      playAdvanceAudio(words[currentIdx]);
     } else {
       // finished the list
       wordDisplay.innerHTML = '<div class="completion-banner"><div class="check">◆</div><p>list complete — restart to practice again</p></div>';
@@ -1293,21 +1418,21 @@ document.getElementById('prev-btn').addEventListener('click', () => {
   if (words.length === 0) return;
   currentIdx = (currentIdx - 1 + words.length) % words.length;
   renderWord();
-  playAudioIfEnabled(words[currentIdx]);
+  playAdvanceAudio(words[currentIdx]);
   typingInput.focus();
 });
 document.getElementById('skip-btn').addEventListener('click', () => {
   if (words.length === 0) return;
   currentIdx = (currentIdx + 1) % words.length;
   renderWord();
-  playAudioIfEnabled(words[currentIdx]);
+  playAdvanceAudio(words[currentIdx]);
   typingInput.focus();
 });
 document.getElementById('reset-btn').addEventListener('click', () => {
   currentIdx = 0;
   errorCount = 0;
   renderWord();
-  playAudioIfEnabled(words[currentIdx]);
+  playAdvanceAudio(words[currentIdx]);
   typingInput.focus();
 });
 
@@ -1378,9 +1503,81 @@ const emptyStateEl = document.getElementById('empty-state');
 const newArabicInput = document.getElementById('new-arabic');
 const newTranslitInput = document.getElementById('new-translit');
 
+const collectionPillsEl = document.getElementById('collection-pills');
+
+function renderCollectionsBar() {
+  collectionPillsEl.innerHTML = collections.map(c => {
+    const active = c.id === activeCollectionId ? ' active' : '';
+    return `<button class="collection-pill${active}" data-id="${escapeHtml(c.id)}">${escapeHtml(c.name)}<span class="pill-count">${c.items.length}</span></button>`;
+  }).join('');
+}
+
+collectionPillsEl.addEventListener('click', (e) => {
+  const pill = e.target.closest('.collection-pill');
+  if (!pill) return;
+  setActiveCollection(pill.dataset.id);
+});
+
+function setActiveCollection(id) {
+  if (id === activeCollectionId) return;
+  const next = collections.find(c => c.id === id);
+  if (!next) return;
+  activeCollectionId = id;
+  refreshActiveCollection();
+  currentIdx = 0;
+  errorCount = 0;
+  settings.activeCollectionId = id;
+  saveSettings();
+  renderCollectionsBar();
+  renderList();
+  renderWord();
+  renderSyncStatus();
+}
+
+document.getElementById('new-collection').addEventListener('click', () => {
+  const name = (prompt('name of new collection?') || '').trim();
+  if (!name) return;
+  const id = newCollectionId();
+  collections.push({ id, name, items: [] });
+  saveCollections();
+  setActiveCollection(id);
+});
+
+document.getElementById('rename-collection').addEventListener('click', () => {
+  const active = getActiveCollection();
+  if (!active) return;
+  const name = (prompt('rename collection to:', active.name) || '').trim();
+  if (!name || name === active.name) return;
+  active.name = name;
+  saveCollections();
+  renderCollectionsBar();
+  renderSyncStatus();
+});
+
+document.getElementById('delete-collection').addEventListener('click', () => {
+  if (collections.length <= 1) { toast("can't delete the last collection"); return; }
+  const active = getActiveCollection();
+  if (!active) return;
+  if (!confirm(`Delete collection "${active.name}" and all ${active.items.length} entries?`)) return;
+  const idx = collections.findIndex(c => c.id === active.id);
+  collections.splice(idx, 1);
+  const fallback = collections[Math.max(0, idx - 1)];
+  activeCollectionId = fallback.id;
+  refreshActiveCollection();
+  currentIdx = 0;
+  errorCount = 0;
+  settings.activeCollectionId = activeCollectionId;
+  saveSettings();
+  saveCollections();
+  renderCollectionsBar();
+  renderList();
+  renderWord();
+  renderSyncStatus();
+});
+
 function renderList() {
   wordListEl.innerHTML = '';
-  listCountEl.textContent = words.length + (words.length === 1 ? ' word' : ' words');
+  listCountEl.textContent = words.length + (words.length === 1 ? ' entry' : ' entries');
   emptyStateEl.style.display = words.length === 0 ? 'block' : 'none';
 
   const enabled = audioEnabled();
@@ -1653,7 +1850,7 @@ function startRacer(mode) {
   rErrorsEl.textContent = '0';
   racerInput.value = '';
   setTimeout(() => racerInput.focus(), 50);
-  playAudioIfEnabled(racerState.stream[0]);
+  playAdvanceAudio(racerState.stream[0]);
 }
 
 function startRacerTimerIfNeeded() {
@@ -1732,6 +1929,9 @@ racerInput.addEventListener('input', () => {
   racerState.currentLetterCount = typed.length;
 
   if (racerState.currentLetterCount === target.length) {
+    const completedWord = racerState.stream[racerState.currentWordIdx];
+    playCompletedAudio(completedWord);
+
     racerState.correctChars += target.length;
     racerState.currentWordIdx++;
     racerState.currentLetterCount = 0;
@@ -1745,7 +1945,7 @@ racerInput.addEventListener('input', () => {
     highlightActiveWord();
     adjustRacerScroll();
     updateLiveWpm();
-    playAudioIfEnabled(racerState.stream[racerState.currentWordIdx]);
+    playAdvanceAudio(racerState.stream[racerState.currentWordIdx]);
   }
   updateHighlight();
 });
@@ -1857,9 +2057,11 @@ function renderSyncStatus() {
   } else if (status === 'error') {
     detail = `last push failed: ${syncErrorMessage}. changes are saved locally and will retry on the next edit.`;
   } else if (status === 'synced') {
+    const total = collections.reduce((n, c) => n + c.items.length, 0);
+    const summary = `${collections.length} collection${collections.length === 1 ? '' : 's'} · ${total} entr${total === 1 ? 'y' : 'ies'}`;
     detail = wordlistLastModified
-      ? `${words.length} word${words.length === 1 ? '' : 's'} · last update ${new Date(wordlistLastModified).toLocaleString()}`
-      : `${words.length} word${words.length === 1 ? '' : 's'} · not yet pushed to worker`;
+      ? `${summary} · last update ${new Date(wordlistLastModified).toLocaleString()}`
+      : `${summary} · not yet pushed to worker`;
   }
   syncDetail.textContent = detail;
 }
@@ -1874,14 +2076,25 @@ async function fetchRemoteWordlist() {
   } catch (e) { return null; }
 }
 
-function setWordsFromRemote(data) {
-  if (!data || !Array.isArray(data.words)) return false;
-  words = data.words;
+// Accepts either the new shape ({ collections, lastModified }) or the legacy shape
+// ({ words, lastModified }), normalizes into collections, and replaces local state.
+function setCollectionsFromRemote(data) {
+  if (!data) return false;
+  let next;
+  if (Array.isArray(data.collections)) {
+    next = normalizeCollections({ collections: data.collections });
+  } else if (Array.isArray(data.words)) {
+    next = [{ id: 'default', name: 'Words', items: data.words }];
+  } else {
+    return false;
+  }
+  collections = next;
   wordlistLastModified = data.lastModified || null;
-  suppressWordlistPush = true;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(words)); } catch (e) {}
-  suppressWordlistPush = false;
+  refreshActiveCollection();
   if (currentIdx >= words.length) currentIdx = 0;
+  suppressWordlistPush = true;
+  saveCollections();
+  suppressWordlistPush = false;
   return true;
 }
 
@@ -1907,11 +2120,11 @@ async function runWordlistPush() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${settings.uploadPassword}`,
       },
-      body: JSON.stringify({ words, lastModified: wordlistLastModified }),
+      body: JSON.stringify({ collections, lastModified: wordlistLastModified }),
     });
     if (res.status === 409) {
       const data = await res.json().catch(() => ({}));
-      if (data && data.current && setWordsFromRemote(data.current)) {
+      if (data && data.current && setCollectionsFromRemote(data.current)) {
         renderList();
         renderWord();
         toast('list was changed elsewhere — reloaded');
@@ -1940,8 +2153,9 @@ async function runWordlistPush() {
 
 async function loadRemoteWordlistOnInit() {
   const remote = await fetchRemoteWordlist();
-  if (!remote || !Array.isArray(remote.words)) { renderSyncStatus(); return; }
-  if (!setWordsFromRemote(remote)) { renderSyncStatus(); return; }
+  if (!remote) { renderSyncStatus(); return; }
+  if (!setCollectionsFromRemote(remote)) { renderSyncStatus(); return; }
+  renderCollectionsBar();
   renderList();
   renderWord();
   renderSyncStatus();
@@ -1949,26 +2163,30 @@ async function loadRemoteWordlistOnInit() {
 
 async function migrateWordlistOnPasswordSet() {
   const remote = await fetchRemoteWordlist();
-  if (remote && Array.isArray(remote.words)) {
-    if (setWordsFromRemote(remote)) {
+  const hasRemote = remote && (Array.isArray(remote.collections) || Array.isArray(remote.words));
+  if (hasRemote) {
+    if (setCollectionsFromRemote(remote)) {
+      renderCollectionsBar();
       renderList();
       renderWord();
-      toast(`loaded ${remote.words.length} words from worker`);
+      const total = collections.reduce((n, c) => n + c.items.length, 0);
+      toast(`loaded ${total} entries from worker`);
     }
     renderSyncStatus();
     return;
   }
-  // No remote yet — upload current local list (one-time migration).
-  if (words.length > 0) {
+  // No remote yet — upload current local collections (one-time migration).
+  const totalLocal = collections.reduce((n, c) => n + c.items.length, 0);
+  if (totalLocal > 0) {
     await runWordlistPush();
-    if (wordlistLastModified) toast(`uploaded ${words.length} words to worker`);
+    if (wordlistLastModified) toast(`uploaded ${totalLocal} entries to worker`);
   }
   renderSyncStatus();
 }
 
 /* ========== AUDIO ========== */
 const audioFilePicker = document.getElementById('audio-file-picker');
-const autoplayToggle = document.getElementById('autoplay-toggle');
+const autoplaySelect = document.getElementById('autoplay-select');
 const uploadPasswordInput = document.getElementById('upload-password-input');
 const savePasswordBtn = document.getElementById('save-password');
 const clearPasswordBtn = document.getElementById('clear-password');
@@ -1989,8 +2207,16 @@ function playWordAudio(word) {
   a.play().catch(() => { /* autoplay blocked or 404 — ignore */ });
 }
 
-function playAudioIfEnabled(word) {
-  if (!settings.autoplay) return;
+// Play audio for a word the user just ADVANCED TO (e.g. after skip / prev / restart,
+// after completing the previous word, or at racer start).
+function playAdvanceAudio(word) {
+  if (settings.autoplay !== 'advanced') return;
+  playWordAudio(word);
+}
+
+// Play audio for a word the user just FINISHED TYPING (fires at completion, before advance).
+function playCompletedAudio(word) {
+  if (settings.autoplay !== 'completed') return;
   playWordAudio(word);
 }
 
@@ -2085,34 +2311,40 @@ async function syncAudioList() {
     const set = new Set(files || []);
     const exts = ['mp3', 'ogg', 'oga', 'opus', 'm4a', 'mp4', 'aac', 'wav', 'webm', 'flac'];
     let changed = false;
-    words.forEach(w => {
-      if (!w.arabic) return;
-      if (w.audio && set.has(w.audio)) return;
-      let found = null;
-      for (const ext of exts) {
-        const cand = `${w.arabic}.${ext}`;
-        if (set.has(cand)) { found = cand; break; }
-      }
-      if (found && w.audio !== found) { w.audio = found; changed = true; }
-      else if (!found && w.audio) { delete w.audio; changed = true; }
+    let totalEntries = 0;
+    let linkedEntries = 0;
+    collections.forEach(c => {
+      c.items.forEach(w => {
+        if (!w.arabic) return;
+        totalEntries++;
+        if (w.audio && set.has(w.audio)) { linkedEntries++; return; }
+        let found = null;
+        for (const ext of exts) {
+          const cand = `${w.arabic}.${ext}`;
+          if (set.has(cand)) { found = cand; break; }
+        }
+        if (found && w.audio !== found) { w.audio = found; changed = true; linkedEntries++; }
+        else if (!found && w.audio) { delete w.audio; changed = true; }
+        else if (w.audio) linkedEntries++;
+      });
     });
-    if (changed) { saveWords(); renderList(); }
-    audioInfoEl.textContent = `${set.size} file${set.size === 1 ? '' : 's'} on worker · ${words.filter(w => w.audio).length}/${words.length} words linked.`;
+    if (changed) { saveCollections(); renderList(); }
+    audioInfoEl.textContent = `${set.size} file${set.size === 1 ? '' : 's'} on worker · ${linkedEntries}/${totalEntries} entries linked.`;
   } catch (e) {
     audioInfoEl.textContent = 'sync failed (network).';
   }
 }
 
 function refreshAudioSettingsUi() {
-  autoplayToggle.checked = !!settings.autoplay;
+  autoplaySelect.value = settings.autoplay;
   uploadPasswordInput.value = settings.uploadPassword || '';
   clearPasswordBtn.style.display = settings.uploadPassword ? '' : 'none';
   audioInfoEl.textContent = '';
   renderSyncStatus();
 }
 
-autoplayToggle.addEventListener('change', () => {
-  settings.autoplay = autoplayToggle.checked;
+autoplaySelect.addEventListener('change', () => {
+  settings.autoplay = autoplaySelect.value;
   saveSettings();
 });
 
@@ -2155,6 +2387,7 @@ document.getElementById('input-hint-label').addEventListener('click', () => typi
 wordDisplay.addEventListener('click', () => typingInput.focus());
 
 /* ========== INIT ========== */
+renderCollectionsBar();
 renderWord();
 renderList();
 setHintVisible(hintVisible);
