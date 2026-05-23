@@ -1,0 +1,11 @@
+name = "arabic-audio"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+
+# Paste your Cloudflare account ID here.
+# Find it at: https://dash.cloudflare.com → right sidebar → "Account ID"
+account_id = "96b960134b5668109eb65c75558ccfb7"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "arabic-audio"

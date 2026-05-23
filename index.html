@@ -28,10 +28,14 @@
   html, body { height: 100%; }
 
   body {
-    background: var(--bg);
+    background-color: var(--bg);
     background-image:
-      radial-gradient(circle at 15% 20%, rgba(139, 58, 31, 0.05) 0%, transparent 45%),
-      radial-gradient(circle at 85% 80%, rgba(61, 94, 31, 0.04) 0%, transparent 45%);
+      linear-gradient(rgba(244, 237, 224, 0.55), rgba(235, 225, 207, 0.65)),
+      url('hatoyamakaikanbackground.webp');
+    background-size: cover;
+    background-position: center center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: var(--ink);
     font-family: 'Cormorant Garamond', serif;
     min-height: 100vh;
@@ -428,6 +432,93 @@
     font-style: italic;
   }
 
+  /* --- Audio settings + per-row audio cell --- */
+  .audio-settings {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    margin-bottom: 1.4rem;
+    padding: 0.5rem 0.9rem;
+  }
+  .audio-settings[open] { padding-bottom: 1rem; }
+  .audio-settings summary {
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    padding: 0.3rem 0;
+    list-style: none;
+  }
+  .audio-settings summary::-webkit-details-marker { display: none; }
+  .audio-settings summary::before {
+    content: '▸ ';
+    color: var(--ink-faint);
+    transition: transform 0.15s ease;
+    display: inline-block;
+    margin-right: 0.3em;
+  }
+  .audio-settings[open] summary::before { content: '▾ '; }
+  .audio-settings-body {
+    padding: 0.7rem 0 0.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .audio-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  .audio-row.toggle-row { cursor: pointer; }
+  .audio-row.password-row input {
+    flex: 1;
+    min-width: 220px;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.4rem 0.7rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    color: var(--ink);
+    outline: none;
+  }
+  .audio-row.password-row input:focus { border-color: var(--accent); }
+  .audio-info {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--ink-faint);
+    min-height: 1.2em;
+  }
+
+  .word-table .audio-cell {
+    white-space: nowrap;
+    text-align: center;
+    width: 1%;
+    padding-right: 0.5rem !important;
+  }
+  .audio-dot {
+    display: inline-block;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    border: 1px solid var(--ink-faint);
+    vertical-align: middle;
+    margin-right: 0.4em;
+    background: transparent;
+  }
+  .audio-dot.has-audio {
+    background: var(--correct);
+    border-color: var(--correct);
+  }
+  .audio-action { font-size: 0.85rem; }
+  .audio-action.upload:hover { color: var(--accent); background: rgba(139,58,31,0.08); }
+  .audio-action.play:hover { color: var(--correct); background: var(--correct-bg); }
+
   .data-controls {
     margin-top: 1.5rem;
     padding-top: 1.2rem;
@@ -644,7 +735,7 @@
 <div class="container">
   <header>
     <h1>كتابة — Arabic Typing Trainer</h1>
-    <div class="subtitle">type each letter; correct ones turn green</div>
+    <div class="subtitle">type each letter; correct ones turn solid black</div>
   </header>
 
   <nav class="tabs">
@@ -762,6 +853,22 @@
         <span class="list-count" id="list-count">0 words</span>
       </div>
 
+      <details class="audio-settings" id="audio-settings">
+        <summary>audio settings</summary>
+        <div class="audio-settings-body">
+          <label class="audio-row toggle-row">
+            <input type="checkbox" id="autoplay-toggle">
+            <span>autoplay audio when advancing to a new word</span>
+          </label>
+          <div class="audio-row password-row">
+            <input type="password" id="upload-password-input" placeholder="upload password (saved on this device only)">
+            <button class="btn subtle" id="save-password">save</button>
+            <button class="btn subtle" id="clear-password" style="display:none">clear</button>
+          </div>
+          <div class="audio-info" id="audio-info"></div>
+        </div>
+      </details>
+
       <div class="add-form">
         <input type="text" class="arabic-input" id="new-arabic" placeholder="الكلمة بالعربية">
         <input type="text" class="translit-input" id="new-translit" placeholder="meaning or transliteration (optional)">
@@ -771,6 +878,8 @@
       <table class="word-table">
         <tbody id="word-list"></tbody>
       </table>
+
+      <input type="file" id="audio-file-picker" style="display:none" accept="audio/*,.mp3,.ogg,.oga,.m4a,.wav,.webm,.opus,.aac,.flac">
 
       <div class="empty-state" id="empty-state" style="display:none">
         no words yet — add some above to start practicing
@@ -854,6 +963,11 @@ const KEY_POSITIONS = {
   ' ': k(180,165,240,31)
 };
 
+/* ========== CONFIG ========== */
+// Paste the URL of your deployed Cloudflare Worker here (no trailing slash).
+// e.g. 'https://arabic-audio.your-subdomain.workers.dev'
+const WORKER_URL = 'https://arabic-audio.7-derpy.workers.dev';
+
 /* ========== STATE ========== */
 const STORAGE_KEY = 'arabic-trainer-words-v1';
 const SETTINGS_KEY = 'arabic-trainer-settings-v1';
@@ -888,11 +1002,12 @@ function saveWords() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(words)); } catch (e) {}
 }
 function loadSettings() {
+  const defaults = { hintVisible: false, autoplay: false, uploadPassword: '' };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return Object.assign({}, defaults, JSON.parse(raw));
   } catch (e) {}
-  return { hintVisible: false };
+  return defaults;
 }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
@@ -916,7 +1031,9 @@ document.querySelectorAll('.tab').forEach(tab => {
       renderWord();
       setTimeout(() => document.getElementById('typing-input').focus(), 50);
     } else if (tab.dataset.tab === 'words') {
+      refreshAudioSettingsUi();
       renderList();
+      syncAudioList();
     } else if (tab.dataset.tab === 'racer') {
       racerState = null;
       showRacerScreen('mode');
@@ -962,6 +1079,7 @@ function renderWord() {
   typedCount = 0;
   typingInput.value = '';
   updateHighlight();
+  playAudioIfEnabled(word);
 }
 
 function splitArabicWord(str) {
@@ -1175,11 +1293,29 @@ function renderList() {
   listCountEl.textContent = words.length + (words.length === 1 ? ' word' : ' words');
   emptyStateEl.style.display = words.length === 0 ? 'block' : 'none';
 
+  const enabled = audioEnabled();
+  const upload = canUpload();
+
   words.forEach((w, i) => {
+    const has = !!(w.audio && enabled);
+    const dotTitle = has ? `audio: ${w.audio}` : 'no audio';
+    const playBtn = (has)
+      ? `<button class="icon-btn audio-action play" data-action="audio-play" data-idx="${i}" title="play audio">▶</button>`
+      : '';
+    const uploadBtn = upload
+      ? `<button class="icon-btn audio-action upload" data-action="audio-upload" data-idx="${i}" title="${w.audio ? 'replace audio' : 'upload audio'}">↥</button>`
+      : '';
+    const deleteAudioBtn = (upload && w.audio)
+      ? `<button class="icon-btn audio-action" data-action="audio-delete" data-idx="${i}" title="remove audio">⌫</button>`
+      : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="arabic-cell">${escapeHtml(w.arabic)}</td>
       <td class="translit-cell">${escapeHtml(w.translit || '')}</td>
+      <td class="audio-cell">
+        <span class="audio-dot${has ? ' has-audio' : ''}" title="${escapeHtml(dotTitle)}"></span>
+        ${playBtn}${uploadBtn}${deleteAudioBtn}
+      </td>
       <td class="actions-cell">
         <button class="icon-btn" data-action="up" data-idx="${i}" title="move up">↑</button>
         <button class="icon-btn" data-action="down" data-idx="${i}" title="move down">↓</button>
@@ -1199,6 +1335,20 @@ wordListEl.addEventListener('click', (e) => {
   if (!btn) return;
   const idx = parseInt(btn.dataset.idx);
   const action = btn.dataset.action;
+
+  if (action === 'audio-play') {
+    playWordAudio(words[idx]);
+    return;
+  }
+  if (action === 'audio-upload') {
+    triggerAudioUpload(idx);
+    return;
+  }
+  if (action === 'audio-delete') {
+    deleteWordAudio(idx);
+    return;
+  }
+
   if (action === 'delete') {
     words.splice(idx, 1);
   } else if (action === 'up' && idx > 0) {
@@ -1413,6 +1563,7 @@ function startRacer(mode) {
   rErrorsEl.textContent = '0';
   racerInput.value = '';
   setTimeout(() => racerInput.focus(), 50);
+  playAudioIfEnabled(racerState.stream[0]);
 }
 
 function startRacerTimerIfNeeded() {
@@ -1504,6 +1655,7 @@ racerInput.addEventListener('input', () => {
     highlightActiveWord();
     adjustRacerScroll();
     updateLiveWpm();
+    playAudioIfEnabled(racerState.stream[racerState.currentWordIdx]);
   }
   updateHighlight();
 });
@@ -1554,6 +1706,184 @@ document.getElementById('r-result-back').addEventListener('click', () => {
 
 window.addEventListener('resize', () => {
   if (racerState && !racerState.finished) adjustRacerScroll();
+});
+
+/* ========== AUDIO ========== */
+const audioFilePicker = document.getElementById('audio-file-picker');
+const autoplayToggle = document.getElementById('autoplay-toggle');
+const uploadPasswordInput = document.getElementById('upload-password-input');
+const savePasswordBtn = document.getElementById('save-password');
+const clearPasswordBtn = document.getElementById('clear-password');
+const audioInfoEl = document.getElementById('audio-info');
+
+let audioUploadTargetIdx = null;
+
+function audioEnabled() { return Boolean(WORKER_URL); }
+function canUpload() { return audioEnabled() && Boolean(settings.uploadPassword); }
+
+function audioUrlFor(filename) {
+  return `${WORKER_URL}/audio/${encodeURIComponent(filename)}`;
+}
+
+function playWordAudio(word) {
+  if (!word || !word.audio || !audioEnabled()) return;
+  const a = new Audio(audioUrlFor(word.audio));
+  a.play().catch(() => { /* autoplay blocked or 404 — ignore */ });
+}
+
+function playAudioIfEnabled(word) {
+  if (!settings.autoplay) return;
+  playWordAudio(word);
+}
+
+function triggerAudioUpload(idx) {
+  if (!audioEnabled()) { toast('worker url not configured'); return; }
+  if (!canUpload()) { toast('save your upload password first'); return; }
+  if (!words[idx]) return;
+  audioUploadTargetIdx = idx;
+  audioFilePicker.value = '';
+  audioFilePicker.click();
+}
+
+audioFilePicker.addEventListener('change', async () => {
+  const file = audioFilePicker.files && audioFilePicker.files[0];
+  const idx = audioUploadTargetIdx;
+  audioUploadTargetIdx = null;
+  if (!file || idx == null) return;
+  const word = words[idx];
+  if (!word) return;
+
+  const orig = file.name || 'audio.mp3';
+  const dot = orig.lastIndexOf('.');
+  const ext = (dot >= 0 ? orig.slice(dot + 1) : 'mp3').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp3';
+  const filename = `${word.arabic}.${ext}`;
+
+  toast('uploading…');
+  const form = new FormData();
+  form.append('file', file);
+  form.append('filename', filename);
+  try {
+    const res = await fetch(`${WORKER_URL}/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${settings.uploadPassword}` },
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast(`upload failed: ${err.error || res.status}`);
+      return;
+    }
+    const data = await res.json();
+    // If we replaced with a different extension, delete the old object.
+    if (word.audio && word.audio !== data.filename) {
+      fetch(`${WORKER_URL}/audio/${encodeURIComponent(word.audio)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${settings.uploadPassword}` },
+      }).catch(() => {});
+    }
+    word.audio = data.filename;
+    saveWords();
+    renderList();
+    toast('audio uploaded');
+  } catch (e) {
+    toast('upload failed: ' + (e && e.message ? e.message : 'network'));
+  }
+});
+
+async function deleteWordAudio(idx) {
+  const word = words[idx];
+  if (!word || !word.audio) return;
+  if (!canUpload()) return;
+  if (!confirm(`Remove audio for "${word.arabic}"?`)) return;
+  try {
+    const res = await fetch(`${WORKER_URL}/audio/${encodeURIComponent(word.audio)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${settings.uploadPassword}` },
+    });
+    if (!res.ok) { toast('delete failed'); return; }
+    delete word.audio;
+    saveWords();
+    renderList();
+    toast('audio removed');
+  } catch (e) { toast('delete failed'); }
+}
+
+async function syncAudioList() {
+  if (!canUpload()) return;
+  audioInfoEl.textContent = 'checking…';
+  try {
+    const res = await fetch(`${WORKER_URL}/list`, {
+      headers: { Authorization: `Bearer ${settings.uploadPassword}` },
+    });
+    if (res.status === 401) {
+      audioInfoEl.textContent = 'password rejected by worker.';
+      return;
+    }
+    if (!res.ok) {
+      audioInfoEl.textContent = `sync failed (${res.status}).`;
+      return;
+    }
+    const { files } = await res.json();
+    const set = new Set(files || []);
+    const exts = ['mp3', 'ogg', 'oga', 'opus', 'm4a', 'mp4', 'aac', 'wav', 'webm', 'flac'];
+    let changed = false;
+    words.forEach(w => {
+      if (!w.arabic) return;
+      if (w.audio && set.has(w.audio)) return;
+      let found = null;
+      for (const ext of exts) {
+        const cand = `${w.arabic}.${ext}`;
+        if (set.has(cand)) { found = cand; break; }
+      }
+      if (found && w.audio !== found) { w.audio = found; changed = true; }
+      else if (!found && w.audio) { delete w.audio; changed = true; }
+    });
+    if (changed) { saveWords(); renderList(); }
+    audioInfoEl.textContent = `${set.size} file${set.size === 1 ? '' : 's'} on worker · ${words.filter(w => w.audio).length}/${words.length} words linked.`;
+  } catch (e) {
+    audioInfoEl.textContent = 'sync failed (network).';
+  }
+}
+
+function refreshAudioSettingsUi() {
+  autoplayToggle.checked = !!settings.autoplay;
+  uploadPasswordInput.value = settings.uploadPassword || '';
+  clearPasswordBtn.style.display = settings.uploadPassword ? '' : 'none';
+  if (!audioEnabled()) {
+    audioInfoEl.textContent = 'WORKER_URL is empty — set it in index.html to enable audio.';
+  } else if (!settings.uploadPassword) {
+    audioInfoEl.textContent = 'paste your upload password to enable uploads.';
+  } else {
+    audioInfoEl.textContent = '';
+  }
+}
+
+autoplayToggle.addEventListener('change', () => {
+  settings.autoplay = autoplayToggle.checked;
+  saveSettings();
+});
+
+function savePasswordFromInput() {
+  const v = uploadPasswordInput.value.trim();
+  settings.uploadPassword = v;
+  saveSettings();
+  refreshAudioSettingsUi();
+  renderList();
+  if (v && audioEnabled()) {
+    toast('password saved');
+    syncAudioList();
+  } else if (!v) {
+    toast('password cleared');
+  }
+}
+
+savePasswordBtn.addEventListener('click', savePasswordFromInput);
+uploadPasswordInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); savePasswordFromInput(); }
+});
+clearPasswordBtn.addEventListener('click', () => {
+  uploadPasswordInput.value = '';
+  savePasswordFromInput();
 });
 
 /* ========== TOAST ========== */
