@@ -1741,7 +1741,7 @@ function addWord() {
   const ar = newArabicInput.value.trim();
   const tr = newTranslitInput.value.trim();
   if (!ar) { newArabicInput.focus(); return; }
-  words.unshift({ arabic: ar, translit: tr });
+  words.unshift({ arabic: ar, translit: tr, createdAt: new Date().toISOString() });
   saveCollections();
   newArabicInput.value = '';
   newTranslitInput.value = '';
@@ -1752,7 +1752,8 @@ function addWord() {
 
 document.getElementById('load-sample').addEventListener('click', () => {
   if (words.length > 0 && !confirm('Append sample words to your existing list?')) return;
-  words.unshift(...SAMPLE_WORDS);
+  const now = new Date().toISOString();
+  words.unshift(...SAMPLE_WORDS.map(w => ({ ...w, createdAt: now })));
   saveCollections();
   renderList();
   toast('sample words added');
@@ -2304,6 +2305,35 @@ function triggerAudioUpload(idx) {
   audioFilePicker.click();
 }
 
+// Sequential audio filenames (0000.ext, 0001.ext, …). Initialised from /list on
+// first use; the local counter then drives every subsequent upload this session.
+let audioCounter = null;
+let audioCounterInit = null;
+async function nextAudioFilename(ext) {
+  if (audioCounter == null) {
+    if (!audioCounterInit) {
+      audioCounterInit = (async () => {
+        try {
+          const res = await fetch(`${WORKER_URL}/list`, {
+            headers: { Authorization: `Bearer ${settings.uploadPassword}` },
+          });
+          if (!res.ok) { audioCounter = 0; return; }
+          const { files } = await res.json();
+          let max = -1;
+          const re = /^(\d+)\./;
+          for (const f of files || []) {
+            const m = re.exec(f);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+          }
+          audioCounter = max + 1;
+        } catch (e) { audioCounter = 0; }
+      })();
+    }
+    await audioCounterInit;
+  }
+  return String(audioCounter++).padStart(4, '0') + '.' + ext;
+}
+
 audioFilePicker.addEventListener('change', async () => {
   const file = audioFilePicker.files && audioFilePicker.files[0];
   const idx = audioUploadTargetIdx;
@@ -2315,7 +2345,7 @@ audioFilePicker.addEventListener('change', async () => {
   const orig = file.name || 'audio.mp3';
   const dot = orig.lastIndexOf('.');
   const ext = (dot >= 0 ? orig.slice(dot + 1) : 'mp3').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp3';
-  const filename = `${word.arabic}.${ext}`;
+  const filename = await nextAudioFilename(ext);
 
   toast('uploading…');
   const form = new FormData();
@@ -2384,7 +2414,6 @@ async function syncAudioList() {
     }
     const { files } = await res.json();
     const set = new Set(files || []);
-    const exts = ['mp3', 'ogg', 'oga', 'opus', 'm4a', 'mp4', 'aac', 'wav', 'webm', 'flac'];
     let changed = false;
     let totalEntries = 0;
     let linkedEntries = 0;
@@ -2392,15 +2421,13 @@ async function syncAudioList() {
       c.items.forEach(w => {
         if (!w.arabic) return;
         totalEntries++;
-        if (w.audio && set.has(w.audio)) { linkedEntries++; return; }
-        let found = null;
-        for (const ext of exts) {
-          const cand = `${w.arabic}.${ext}`;
-          if (set.has(cand)) { found = cand; break; }
+        if (w.audio && !set.has(w.audio)) {
+          // File was deleted out-of-band — drop the broken ref.
+          delete w.audio;
+          changed = true;
+        } else if (w.audio) {
+          linkedEntries++;
         }
-        if (found && w.audio !== found) { w.audio = found; changed = true; linkedEntries++; }
-        else if (!found && w.audio) { delete w.audio; changed = true; }
-        else if (w.audio) linkedEntries++;
       });
     });
     if (changed) { saveCollections(); renderList(); }

@@ -61,6 +61,22 @@ Auth: send `Authorization: Bearer <UPLOAD_PASSWORD>`.
 
 Edit and redeploy to add more.
 
+## One-off scripts
+
+### `scripts/renumber-audio.mjs`
+
+Renames every audio file in the bucket to `NNNN.<ext>` (0000, 0001, …) and rewrites `wordlist.json` so each entry's `audio` field points at its new name. Run it once if your bucket still has Arabic-text filenames from the original upload pattern.
+
+Requires Node 18+ (built-in `fetch`/`FormData`/`Blob`).
+
+```sh
+WORKER_URL=https://arabic-audio.<your-subdomain>.workers.dev \
+UPLOAD_PASSWORD=<your-password> \
+node worker/scripts/renumber-audio.mjs
+```
+
+The script copies each file to its new name first, pushes the updated wordlist, then deletes the old files — so audio stays reachable even if a phase fails partway. Already-numbered entries are skipped, so it's safe to rerun.
+
 ## Local development
 
 ```sh
