@@ -166,6 +166,15 @@
     color: var(--error);
     animation: shake 0.3s ease;
   }
+  .word-display .practice-word {
+    display: inline-block;
+    padding: 0.04em 0.2em;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+  }
+  .word-display .practice-word.active {
+    background: rgba(139, 58, 31, 0.08);
+  }
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-3px); }
@@ -1232,9 +1241,35 @@ function renderWord() {
   // Split into visual letter units, treating "لا" as a single typed unit when present
   const letters = splitArabicWord(word.arabic);
 
-  wordDisplay.innerHTML = letters.map((ch, i) =>
-    `<span class="letter" data-i="${i}">${ch}</span>`
-  ).join('');
+  // Map each letter index to a word-group index (spaces "belong" to the previous group
+  // so the active highlight stays put while the user is typing the trailing space).
+  practiceWordMap = new Array(letters.length);
+  let wIdx = -1;
+  for (let i = 0; i < letters.length; i++) {
+    if (letters[i] === ' ') {
+      practiceWordMap[i] = wIdx;
+    } else {
+      if (i === 0 || letters[i - 1] === ' ') wIdx++;
+      practiceWordMap[i] = wIdx;
+    }
+  }
+
+  // Render: contiguous non-space letters wrapped in a .practice-word, spaces as
+  // standalone .letter.space spans between them. Document order matches letter index.
+  let html = '';
+  let inWord = false;
+  for (let i = 0; i < letters.length; i++) {
+    if (letters[i] === ' ') {
+      if (inWord) { html += '</span>'; inWord = false; }
+      html += `<span class="letter space" data-i="${i}"> </span>`;
+    } else {
+      if (!inWord) { html += '<span class="practice-word">'; inWord = true; }
+      html += `<span class="letter" data-i="${i}">${letters[i]}</span>`;
+    }
+  }
+  if (inWord) html += '</span>';
+  wordDisplay.innerHTML = html;
+
   translitEl.textContent = settings.showTranslit ? (word.translit || '') : '';
   wordIdxEl.textContent = `${currentIdx + 1} / ${words.length}`;
   errorCountEl.textContent = errorCount;
@@ -1242,6 +1277,42 @@ function renderWord() {
   typedCount = 0;
   typingInput.value = '';
   updateHighlight();
+  highlightActivePracticeWord();
+  fitWordDisplay();
+}
+
+let practiceWordMap = [];
+
+const BASE_WORD_FONT_REM = 5;
+const MIN_WORD_FONT_REM = 1.8;
+
+function fitWordDisplay() {
+  // Reset any prior inline override so we measure at the base size first.
+  wordDisplay.style.fontSize = '';
+  if (words.length === 0) return;
+  // Force single-line layout to read the true unwrapped content width.
+  const prevWhiteSpace = wordDisplay.style.whiteSpace;
+  wordDisplay.style.whiteSpace = 'nowrap';
+  const contentWidth = wordDisplay.scrollWidth;
+  const containerWidth = wordDisplay.clientWidth;
+  wordDisplay.style.whiteSpace = prevWhiteSpace || '';
+  if (containerWidth > 0 && contentWidth > containerWidth) {
+    const scale = containerWidth / contentWidth;
+    const newRem = Math.max(MIN_WORD_FONT_REM, BASE_WORD_FONT_REM * scale * 0.97);
+    wordDisplay.style.fontSize = newRem + 'rem';
+  }
+}
+
+window.addEventListener('resize', fitWordDisplay);
+
+function highlightActivePracticeWord() {
+  const wordEls = wordDisplay.querySelectorAll('.practice-word');
+  wordEls.forEach(el => el.classList.remove('active'));
+  // Only show the box when there's more than one word — otherwise it's noise.
+  if (wordEls.length < 2) return;
+  if (typedCount >= practiceWordMap.length) return;
+  const wIdx = practiceWordMap[typedCount];
+  if (wIdx >= 0 && wordEls[wIdx]) wordEls[wIdx].classList.add('active');
 }
 
 function splitArabicWord(str) {
@@ -1305,6 +1376,7 @@ typingInput.addEventListener('input', (e) => {
   }
 
   updateHighlight();
+  highlightActivePracticeWord();
 
   // Completed?
   if (typedCount === target.length) {
@@ -1597,7 +1669,35 @@ function renderList() {
     `;
     wordListEl.appendChild(tr);
   });
+  fitArabicCells();
 }
+
+const BASE_ARABIC_CELL_REM = 1.6;
+const MIN_ARABIC_CELL_REM = 1.1;
+
+function fitArabicCells() {
+  const cells = wordListEl.querySelectorAll('.arabic-cell');
+  if (cells.length === 0) return;
+  // Single offscreen probe to measure unwrapped text width at the base size.
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;direction:rtl;font-family:"Noto Naskh Arabic",serif;font-size:' + BASE_ARABIC_CELL_REM + 'rem;';
+  document.body.appendChild(probe);
+  cells.forEach(cell => {
+    cell.style.fontSize = '';
+    const cellW = cell.clientWidth;
+    if (cellW <= 0) return; // tab not visible yet
+    probe.textContent = cell.textContent;
+    const contentW = probe.offsetWidth;
+    if (contentW > cellW) {
+      const scale = cellW / contentW;
+      const newRem = Math.max(MIN_ARABIC_CELL_REM, BASE_ARABIC_CELL_REM * scale * 0.97);
+      cell.style.fontSize = newRem + 'rem';
+    }
+  });
+  document.body.removeChild(probe);
+}
+
+window.addEventListener('resize', fitArabicCells);
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
