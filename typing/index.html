@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arabic Typing Trainer · مدرّب الطباعة</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #f4ede0;
+  --paper: #fbf6ea;
+  --ink: #2a2218;
+  --ink-soft: #5c4d3a;
+  --ink-faint: #9a8b73;
+  --accent: #8b3a1f;
+  --correct: #3d5e1f;
+  --correct-bg: rgba(61, 94, 31, 0.12);
+  --pending: #b8a98a;
+  --error: #a83a2a;
+  --error-bg: rgba(168, 58, 42, 0.14);
+  --hint: #e4b441;
+  --border: #c9b896;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  background-color: #e7dcc4;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(255,250,238,0.7), transparent 55%),
+    radial-gradient(circle at 85% 90%, rgba(200,184,150,0.45), transparent 50%),
+    linear-gradient(160deg, #f1e8d6, #e3d6ba);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  padding: 1.8rem 1.2rem 4rem;
+}
+
+.container { max-width: 1000px; margin: 0 auto; }
+
+header { text-align: center; padding-bottom: 1.2rem; border-bottom: 1px solid var(--border); margin-bottom: 1.6rem; position: relative; }
+header::after { content: '◆'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: var(--bg); padding: 0 12px; color: var(--accent); font-size: .7rem; }
+h1 { font-family: 'Noto Naskh Arabic', serif; font-weight: 500; font-size: 2.1rem; letter-spacing: .01em; }
+.subtitle { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; color: var(--ink-soft); font-style: italic; margin-top: .15rem; letter-spacing: .04em; }
+
+/* ---- Lesson menu ---- */
+.menu-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .7rem; }
+.menu-head h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.25rem; color: var(--ink-soft); letter-spacing: .03em; }
+.menu-head .reset { font-size: .78rem; color: var(--ink-faint); background: none; border: none; cursor: pointer; text-decoration: underline; }
+.menu-head .reset:hover { color: var(--accent); }
+
+.lessons { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; margin-bottom: 2rem; }
+.lesson-btn {
+  background: var(--paper); border: 1px solid var(--border); border-radius: 8px;
+  padding: .65rem .8rem; cursor: pointer; text-align: left; position: relative;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  font-family: inherit; color: var(--ink); display: flex; flex-direction: column; gap: .25rem;
+}
+.lesson-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(80,60,30,.13); border-color: var(--accent); }
+.lesson-btn.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.lesson-btn .num { font-size: .7rem; color: var(--ink-faint); letter-spacing: .12em; text-transform: uppercase; }
+.lesson-btn .title { font-size: .9rem; font-weight: 500; line-height: 1.2; }
+.lesson-btn .chips { font-family: 'Noto Naskh Arabic', serif; font-size: 1.35rem; color: var(--accent); direction: rtl; line-height: 1; margin-top: .15rem; }
+.lesson-btn .done { position: absolute; top: .5rem; right: .55rem; color: var(--correct); font-size: .8rem; }
+.lesson-btn .best { font-size: .68rem; color: var(--ink-faint); }
+
+/* ---- Practice stage ---- */
+.stage { display: none; scroll-margin-top: 1.2rem; }
+/* min-height keeps the stage at least one screen tall so its top can always
+   scroll to the viewport top — even with the keyboard collapsed — which keeps
+   the practice line near the top instead of stranded at the bottom. */
+.stage.active { display: block; min-height: 100vh; }
+
+.stage-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; margin-bottom: .8rem; }
+.stage-title { font-family: 'Cormorant Garamond', serif; }
+.stage-title .num { font-size: .72rem; color: var(--ink-faint); letter-spacing: .14em; text-transform: uppercase; }
+.stage-title h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+.stage-title .new-keys { font-family: 'Noto Naskh Arabic', serif; font-size: 1.5rem; color: var(--accent); direction: rtl; margin-top: .1rem; }
+
+.stats { display: flex; gap: 1.4rem; }
+.stat { text-align: center; }
+.stat .v { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; line-height: 1; color: var(--ink); }
+.stat .l { font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-top: .2rem; }
+
+/* practice line */
+.linewrap {
+  background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.6rem 1.2rem; margin-bottom: .55rem; min-height: 92px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 1px 3px rgba(80,60,30,.06);
+}
+.line { direction: rtl; display: flex; flex-wrap: wrap; gap: .28rem .2rem; justify-content: center; align-items: center; font-family: 'Noto Naskh Arabic', serif; }
+.cell {
+  unicode-bidi: isolate; min-width: 2.1rem; height: 2.9rem; padding: 0 .3rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 2rem; line-height: 1; color: var(--pending);
+  border-bottom: 3px solid transparent; border-radius: 5px;
+  transition: color .1s ease, background .1s ease, transform .1s ease;
+}
+.cell.space { min-width: 1.2rem; color: var(--border); font-size: 1.3rem; }
+.cell.current { color: var(--ink); background: rgba(228,180,65,.22); border-bottom-color: var(--hint); transform: translateY(-1px); }
+.cell.done { color: var(--correct); }
+.cell.err { color: var(--error); background: var(--error-bg); border-bottom-color: var(--error); animation: shake .18s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+
+.progress { height: 4px; background: rgba(201,184,150,.4); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+
+/* letter name / sound card */
+.letter-info { display: none; align-items: center; justify-content: center; gap: .7rem; min-height: 2.7rem; margin-bottom: .9rem; }
+.letter-info.show { display: flex; }
+.letter-info .li-glyph { font-family: 'Noto Naskh Arabic', serif; font-size: 2.2rem; line-height: 1; color: var(--accent); min-width: 1.5rem; text-align: center; }
+.letter-info .li-text { display: flex; flex-direction: column; align-items: flex-start; gap: .12rem; line-height: 1.25; }
+.letter-info .li-name { font-size: .98rem; color: var(--ink); }
+.letter-info .li-name b { font-weight: 600; }
+.letter-info .li-name .ar { font-family: 'Noto Naskh Arabic', serif; color: var(--ink-soft); }
+.letter-info .li-sound { font-size: .82rem; color: var(--ink-soft); }
+.letter-info .li-sound b { font-weight: 600; color: var(--ink); }
+
+.hintbar { display: flex; align-items: center; justify-content: center; gap: 1.4rem; margin-bottom: 1rem; font-size: .85rem; color: var(--ink-soft); flex-wrap: wrap; }
+.hintbar .finger-dot { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; vertical-align: middle; margin-right: .35rem; border: 1px solid rgba(0,0,0,.12); }
+.lastkey { font-family: 'Noto Naskh Arabic', serif; }
+.lastkey b { font-size: 1.2rem; }
+.lastkey.ok b { color: var(--correct); }
+.lastkey.bad b { color: var(--error); }
+
+/* ---- Keyboard ---- */
+.keyboard { background: rgba(251,246,234,.55); border: 1px solid var(--border); border-radius: 12px; padding: .7rem; user-select: none; }
+.krow { display: flex; gap: .35rem; margin-bottom: .35rem; }
+.krow:last-child { margin-bottom: 0; }
+.key {
+  position: relative; flex: 1 1 0; min-width: 0; height: 3.1rem; border-radius: 7px;
+  background: #fdfaf1; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-faint); transition: all .1s ease; overflow: hidden;
+}
+.key.dim { opacity: .42; }
+.key.active { opacity: 1; background: rgba(var(--fg, 154,139,115), .16); border-color: rgba(var(--fg,154,139,115), .55); color: var(--ink); }
+.key.next { opacity: 1; background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 3px rgba(139,58,31,.25); transform: translateY(-2px); }
+.key.next .k-latin, .key.next .k-shift { color: rgba(255,255,255,.8); }
+.key.shiftnext { opacity: 1; background: rgba(228,180,65,.3); border-color: var(--hint); color: var(--ink); }
+.key .k-main { font-family: 'Noto Naskh Arabic', serif; font-size: 1.35rem; line-height: 1; }
+.key .k-shift { position: absolute; top: 3px; left: 5px; font-family: 'Noto Naskh Arabic', serif; font-size: .8rem; color: var(--ink-faint); }
+.key .k-latin { position: absolute; bottom: 2px; right: 5px; font-size: .58rem; color: var(--ink-faint); letter-spacing: .02em; }
+.key.mod { color: var(--ink-faint); font-size: .7rem; letter-spacing: .05em; flex-grow: var(--w, 1); }
+.key.mod .k-label { font-family: 'Inter', sans-serif; }
+.key.home::after { content: ''; position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); width: 14px; height: 2px; background: var(--ink-faint); border-radius: 2px; }
+.key.hide-latin .k-latin { display: none; }
+
+.kbfoot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem; margin-top: 1rem; font-size: .8rem; color: var(--ink-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: .5rem .9rem; }
+.legend span { display: inline-flex; align-items: center; }
+.legend i { width: .75rem; height: .75rem; border-radius: 3px; margin-right: .3rem; display: inline-block; }
+.toggle { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
+
+/* ---- Controls + sentence (joined) mode ---- */
+.controls { display: flex; justify-content: flex-end; align-items: center; margin-bottom: .55rem; font-size: .8rem; color: var(--ink-soft); }
+.controls .toggle { user-select: none; }
+.stage.hide-kb #keyboard,
+.stage.hide-kb .kbfoot,
+.stage.hide-kb .tip,
+.stage.hide-kb #fingerHint { display: none; }
+
+.line.sentence { direction: rtl; display: block; text-align: center; font-family: 'Noto Naskh Arabic', serif; font-size: clamp(1.6rem, 4.6vw, 2.3rem); line-height: 1.8; }
+.line.sentence .s-done { color: var(--correct); }
+.line.sentence .s-rest { color: var(--pending); }
+.line.sentence .s-cur  { color: var(--ink); background: rgba(228,180,65,.30); border-radius: 5px; }
+.line.sentence .s-cur.space { padding: 0 .3em; }
+.line.sentence .s-cur.err { color: var(--error); background: var(--error-bg); }
+.line.shake { animation: shake .18s; }
+
+/* ---- Completion modal ---- */
+.overlay { position: fixed; inset: 0; background: rgba(42,34,24,.55); display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+.overlay.show { display: flex; }
+.modal { background: var(--paper); border: 1px solid var(--border); border-radius: 14px; padding: 2rem 2.2rem; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(40,30,15,.4); }
+.modal h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; }
+.modal .ar { font-family: 'Noto Naskh Arabic', serif; color: var(--accent); font-size: 1.3rem; margin-bottom: 1rem; }
+.modal .mstats { display: flex; justify-content: center; gap: 1.6rem; margin: 1.2rem 0; }
+.modal .mstats .v { font-family: 'Cormorant Garamond', serif; font-size: 2.1rem; font-weight: 600; }
+.modal .mstats .l { font-size: .65rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.modal .actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.btn { font-family: inherit; font-size: .9rem; padding: .55rem 1.1rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--paper); color: var(--ink); transition: all .12s ease; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+
+.intro { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; color: var(--ink-soft); text-align: center; margin: -.4rem 0 1.6rem; font-style: italic; }
+.tip { text-align:center; font-size:.8rem; color: var(--ink-faint); margin-top:.6rem; }
+
+@media (max-width: 560px) {
+  .key .k-main { font-size: 1.05rem; }
+  .key { height: 2.5rem; }
+  .stats { gap: 1rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>مُدرّب الطِّباعة العربية</h1>
+    <div class="subtitle">Arabic Typing Trainer — the standard Arabic 101 keyboard, one lesson at a time</div>
+  </header>
+
+  <p class="intro">Learn the keyboard by feel. Each lesson adds a few keys, beginning with the home row and working outward through the whole alphabet. Type by <em>position</em> — no Arabic keyboard layout required.</p>
+
+  <div class="menu-head">
+    <h2>Lessons</h2>
+    <button class="reset" id="resetBtn">reset progress</button>
+  </div>
+  <div class="lessons" id="lessons"></div>
+
+  <div class="stage" id="stage">
+    <div class="stage-head">
+      <div class="stage-title">
+        <div class="num" id="stNum">Lesson</div>
+        <h2 id="stTitle"></h2>
+        <div class="new-keys" id="stKeys"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="stWpm">0</div><div class="l">wpm</div></div>
+        <div class="stat"><div class="v" id="stAcc">100<span style="font-size:.9rem">%</span></div><div class="l">accuracy</div></div>
+        <div class="stat"><div class="v" id="stLine">1<span style="font-size:1rem">/6</span></div><div class="l">line</div></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" id="kbToggle" checked> show keyboard &amp; finger guide</label>
+    </div>
+
+    <div class="linewrap"><div class="line" id="line"></div></div>
+    <div class="progress"><i id="prog"></i></div>
+
+    <div class="letter-info" id="letterInfo"></div>
+
+    <div class="hintbar">
+      <span id="fingerHint"><span class="finger-dot" id="fingerDot"></span>—</span>
+      <span class="lastkey" id="lastKey">Press the highlighted key to begin</span>
+    </div>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="kbfoot">
+      <div class="legend" id="legend"></div>
+      <label class="toggle"><input type="checkbox" id="latinToggle" checked> show Latin key hints</label>
+    </div>
+    <p class="tip">Tip: rest your left index on <b>ب</b> (F) and right index on <b>ت</b> (J) — the keys with ridges.</p>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="mTitle">Lesson complete</h3>
+    <div class="ar">أحسنت!</div>
+    <div class="mstats">
+      <div><div class="v" id="mWpm">0</div><div class="l">wpm</div></div>
+      <div><div class="v" id="mAcc">0%</div><div class="l">accuracy</div></div>
+      <div><div class="v" id="mTime">0s</div><div class="l">time</div></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="mRepeat">Repeat</button>
+      <button class="btn" id="mMenu">Lesson menu</button>
+      <button class="btn primary" id="mNext">Next lesson →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Arabic (101) keyboard layout — keyed by physical KeyboardEvent.code
+   so the trainer works regardless of the OS keyboard layout: we
+   validate the *position* you press, not the character the OS emits.
+   For each key: base (no shift), shift (shifted glyph), finger, latin label.
+   `sd` = display override for combining marks (shown on a dotted circle ◌).
+   ============================================================ */
+const DC = '◌'; // dotted circle carrier for harakat
+const L = {
+  Backquote:{b:'ذ', s:'ّ', sd:DC+'ّ', f:'lp', latin:'`'},   // shadda
+  Digit1:{b:'1', s:'!', f:'lp', latin:'1'},
+  Digit2:{b:'2', s:'@', f:'lr', latin:'2'},
+  Digit3:{b:'3', s:'#', f:'lm', latin:'3'},
+  Digit4:{b:'4', s:'$', f:'li', latin:'4'},
+  Digit5:{b:'5', s:'%', f:'li', latin:'5'},
+  Digit6:{b:'6', s:'^', f:'ri', latin:'6'},
+  Digit7:{b:'7', s:'&', f:'ri', latin:'7'},
+  Digit8:{b:'8', s:'*', f:'rm', latin:'8'},
+  Digit9:{b:'9', s:')', f:'rr', latin:'9'},
+  Digit0:{b:'0', s:'(', f:'rp', latin:'0'},
+  Minus:{b:'-', s:'_', f:'rp', latin:'-'},
+  Equal:{b:'=', s:'+', f:'rp', latin:'='},
+
+  KeyQ:{b:'ض', s:'َ', sd:DC+'َ', f:'lp', latin:'Q'},   // fatha
+  KeyW:{b:'ص', s:'ً', sd:DC+'ً', f:'lr', latin:'W'},   // fathatan
+  KeyE:{b:'ث', s:'ُ', sd:DC+'ُ', f:'lm', latin:'E'},   // damma
+  KeyR:{b:'ق', s:'ٌ', sd:DC+'ٌ', f:'li', latin:'R'},   // dammatan
+  KeyT:{b:'ف', s:'لإ', f:'li', latin:'T'},             // لإ
+  KeyY:{b:'غ', s:'إ', f:'ri', latin:'Y'},                   // إ
+  KeyU:{b:'ع', s:'`', f:'ri', latin:'U'},
+  KeyI:{b:'ه', s:'÷', f:'rm', latin:'I'},
+  KeyO:{b:'خ', s:'×', f:'rr', latin:'O'},
+  KeyP:{b:'ح', s:'؛', f:'rp', latin:'P'},                   // ؛
+  BracketLeft:{b:'ج', s:'<', f:'rp', latin:'['},
+  BracketRight:{b:'د', s:'>', f:'rp', latin:']'},
+  Backslash:{b:'\\', s:'|', f:'rp', latin:'\\'},
+
+  KeyA:{b:'ش', s:'ِ', sd:DC+'ِ', f:'lp', latin:'A'},   // kasra
+  KeyS:{b:'س', s:'ٍ', sd:DC+'ٍ', f:'lr', latin:'S'},   // kasratan
+  KeyD:{b:'ي', s:']', f:'lm', latin:'D'},
+  KeyF:{b:'ب', s:'[', f:'li', latin:'F', home:true},
+  KeyG:{b:'ل', s:'لأ', f:'li', latin:'G'},             // لأ
+  KeyH:{b:'ا', s:'أ', f:'ri', latin:'H'},                   // أ
+  KeyJ:{b:'ت', s:'ـ', f:'ri', latin:'J', home:true},        // ـ tatweel
+  KeyK:{b:'ن', s:'،', f:'rm', latin:'K'},                   // ،
+  KeyL:{b:'م', s:'/', f:'rr', latin:'L'},
+  Semicolon:{b:'ك', s:':', f:'rp', latin:';'},
+  Quote:{b:'ط', s:'"', f:'rp', latin:"'"},
+
+  KeyZ:{b:'ئ', s:'~', f:'lp', latin:'Z'},
+  KeyX:{b:'ء', s:'ْ', sd:DC+'ْ', f:'lr', latin:'X'},   // sukun
+  KeyC:{b:'ؤ', s:'}', f:'lm', latin:'C'},
+  KeyV:{b:'ر', s:'{', f:'li', latin:'V'},
+  KeyB:{b:'لا', s:'لآ', f:'li', latin:'B'},  // لا / لآ
+  KeyN:{b:'ى', s:'آ', f:'ri', latin:'N'},                   // آ
+  KeyM:{b:'ة', s:"'", f:'rm', latin:'M'},
+  Comma:{b:'و', s:',', f:'rm', latin:','},
+  Period:{b:'ز', s:'.', f:'rr', latin:'.'},
+  Slash:{b:'ظ', s:'؟', f:'rp', latin:'/'},                  // ؟
+
+  Space:{b:' ', f:'thumb', latin:'space'}
+};
+
+const FINGERS = {
+  lp:{rgb:'197,124,84',  name:'left pinky'},
+  lr:{rgb:'203,160,74',  name:'left ring'},
+  lm:{rgb:'138,154,91',  name:'left middle'},
+  li:{rgb:'99,150,135',  name:'left index'},
+  ri:{rgb:'108,143,169', name:'right index'},
+  rm:{rgb:'150,124,170', name:'right middle'},
+  rr:{rgb:'176,122,154', name:'right ring'},
+  rp:{rgb:'181,107,107', name:'right pinky'},
+  thumb:{rgb:'154,139,115', name:'thumb'}
+};
+
+/* ============================================================
+   Lessons. Base lessons list `add` (codes) and the pool is the
+   cumulative union of all earlier `add`. Shift/number lessons list
+   explicit `items` ({code, shift, new}) so we control the drill pool.
+   ============================================================ */
+const LESSONS = [
+  {title:'Home Row · Left Hand',   add:['KeyA','KeyS','KeyD','KeyF']},
+  {title:'Home Row · Right Hand',  add:['KeyJ','KeyK','KeyL','Semicolon']},
+  {title:'Home Row · Index Reach', add:['KeyG','KeyH']},
+  {title:'Home Row · Complete',    add:['Quote']},
+  {title:'Top Row · Left Hand',    add:['KeyQ','KeyW','KeyE','KeyR']},
+  {title:'Top Row · Right Hand',   add:['KeyU','KeyI','KeyO','KeyP']},
+  {title:'Top Row · Index Reach',  add:['KeyT','KeyY']},
+  {title:'Bottom Row · Left Hand', add:['KeyZ','KeyX','KeyC','KeyV']},
+  {title:'Bottom Row · Right Hand',add:['KeyN','KeyM','Comma','Period']},
+  {title:'Bottom Row · Reaches',   add:['KeyB','Slash']},
+  {title:'The Last Letters',       add:['BracketLeft','BracketRight','Backquote']},
+  {title:'Full Alphabet Review',   add:[]},
+  {title:'Hamza Forms', type:'shift', items:[
+      {code:'KeyH',shift:true,new:true},{code:'KeyY',shift:true,new:true},{code:'KeyN',shift:true,new:true},
+      {code:'KeyG',shift:true,new:true},{code:'KeyT',shift:true,new:true},{code:'KeyB',shift:true,new:true},
+      {code:'KeyH'},{code:'KeyL'},{code:'KeyD'} ]},
+  {title:'Egyptian Arabic Sentences', type:'sentence', sentences:[
+      'إزيك عامل إيه النهارده',
+      'أنا رايح الشغل بدري',
+      'إحنا هنخرج بالليل مع الأصحاب',
+      'الجو حلو أوي النهارده',
+      'هي بتحب القهوة بالسكر',
+      'فين المحطة من فضلك',
+      'الأكل ده طعمه لذيذ جدا',
+      'احنا بنحب نلعب كورة في النادي',
+      'ممكن تساعدني في الحاجة دي',
+      'القطر هيوصل بعد شوية',
+      'عايز أشرب شاي بالنعناع',
+      'البنت دي شاطرة في المدرسة' ]},
+  {title:'Short Vowels · Harakat', type:'shift', items:[
+      {code:'KeyQ',shift:true,new:true},{code:'KeyE',shift:true,new:true},{code:'KeyA',shift:true,new:true},
+      {code:'KeyF'},{code:'KeyJ'},{code:'KeyK'},{code:'KeyL'},{code:'KeyG'},{code:'KeyH'},{code:'KeyV'} ]},
+  {title:'Tanwin, Sukun & Shadda', type:'shift', items:[
+      {code:'KeyW',shift:true,new:true},{code:'KeyR',shift:true,new:true},{code:'KeyS',shift:true,new:true},
+      {code:'KeyX',shift:true,new:true},{code:'Backquote',shift:true,new:true},
+      {code:'KeyF'},{code:'KeyB'},{code:'KeyD'},{code:'KeyH'} ]},
+  {title:'Punctuation & Tatweel', type:'shift', items:[
+      {code:'KeyK',shift:true,new:true},{code:'KeyP',shift:true,new:true},{code:'Slash',shift:true,new:true},{code:'KeyJ',shift:true,new:true},
+      {code:'KeyL'},{code:'KeyG'},{code:'KeyH'},{code:'KeyF'},{code:'KeyV'} ]},
+  {title:'The Number Row', type:'num', items:[
+      {code:'Digit1',new:true},{code:'Digit2',new:true},{code:'Digit3',new:true},{code:'Digit4',new:true},{code:'Digit5',new:true},
+      {code:'Digit6',new:true},{code:'Digit7',new:true},{code:'Digit8',new:true},{code:'Digit9',new:true},{code:'Digit0',new:true} ]}
+];
+
+const LINES_PER_LESSON = 6;
+const LETTERS_PER_LINE = 14;
+const STORE_KEY = 'arabicTrainerProgress.v1';
+
+/* ---------- helpers ---------- */
+function charOf(code, shift){ if(code==='Space') return ' '; const k=L[code]; return shift ? k.s : k.b; }
+function dispOf(code, shift){
+  if(code==='Space') return '·';
+  const k=L[code];
+  if(shift) return k.sd || k.s;
+  return k.b;
+}
+function rand(n){ return Math.floor(Math.random()*n); }
+function pick(a){ return a[rand(a.length)]; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rand(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* Reverse map: Arabic character -> {code, shift}. Single-codepoint values only
+   (the لا/لأ ligature keys are skipped — in real text ل and ا are typed apart).
+   Base layer wins over the shift layer when a glyph appears on both. */
+const CHAR2KEY = (function(){
+  const m = {};
+  for(const code in L){ const v = L[code].b; if(v && [...v].length===1 && !(v in m)) m[v] = {code, shift:false}; }
+  for(const code in L){ const v = L[code].s; if(v && [...v].length===1 && !(v in m)) m[v] = {code, shift:true}; }
+  m[' '] = {code:'Space', shift:false};
+  return m;
+})();
+
+/* Arabic cursive joining: connects(a,b) is true when, in normal text, letter a
+   joins to the following letter b — i.e. cutting between them needs a ZWJ on
+   each side to keep the connected shapes. NO_FORWARD = letters that never join
+   to the next letter (right-joining only) plus space. */
+const NO_FORWARD = new Set(['ا','أ','إ','آ','د','ذ','ر','ز','و','ؤ','ء','ة','ى',' ']);
+function isArabicLetter(ch){ return ch >= 'ء' && ch <= 'ي'; }
+function connects(a,b){ return isArabicLetter(a) && isArabicLetter(b) && !NO_FORWARD.has(a) && b !== 'ء'; }
+
+/* Resolve a lesson index -> {pool:[{code,shift}], news:[{code,shift}]} */
+function resolveLesson(idx){
+  const lesson = LESSONS[idx];
+  if(lesson.type === 'sentence'){
+    const codes = [];
+    for(const s of lesson.sentences) for(const ch of s){ const k = CHAR2KEY[ch]; if(k && !codes.includes(k.code)) codes.push(k.code); }
+    return { pool: codes.map(c=>({code:c, shift:false})), news: [] };
+  }
+  if(lesson.add !== undefined){
+    const codes = [];
+    for(let i=0;i<=idx;i++){ const a=LESSONS[i].add; if(a) for(const c of a) if(!codes.includes(c)) codes.push(c); }
+    return { pool: codes.map(c=>({code:c,shift:false})),
+             news: lesson.add.map(c=>({code:c,shift:false})) };
+  }
+  const pool = lesson.items.map(it=>({code:it.code, shift:!!it.shift}));
+  const news = lesson.items.filter(it=>it.new).map(it=>({code:it.code, shift:!!it.shift}));
+  return { pool, news };
+}
+
+/* Build one practice line (array of cell descriptors, incl. spaces). */
+function genLine(pool, news){
+  const bag = [];
+  for(const it of pool) bag.push(it);
+  for(const it of news){ bag.push(it); bag.push(it); bag.push(it); } // weight new keys
+  const out = [];
+  let placed = 0;
+  while(placed < LETTERS_PER_LINE){
+    let wlen = 2 + rand(3);
+    if(placed + wlen > LETTERS_PER_LINE) wlen = LETTERS_PER_LINE - placed;
+    for(let i=0;i<wlen;i++){ out.push(pick(bag)); placed++; }
+    if(placed < LETTERS_PER_LINE) out.push({code:'Space', shift:false, _space:true});
+  }
+  // Guarantee every new key appears at least once. Use distinct spots and
+  // never destroy the only copy of another new key (only overwrite non-new
+  // cells, or new cells that still have a duplicate elsewhere on the line).
+  const key = it => it.code + '|' + (it.shift?1:0);
+  const newKeys = new Set(news.map(key));
+  const present = new Set(out.filter(it=>!it._space).map(key));
+  const missing = news.filter(nw=>!present.has(key(nw)));
+  if(missing.length){
+    const counts = {};
+    out.forEach(it=>{ if(!it._space) counts[key(it)] = (counts[key(it)]||0)+1; });
+    const spots = [];
+    out.forEach((it,i)=>{
+      if(it._space) return;
+      const k = key(it);
+      if(!newKeys.has(k)) { spots.push(i); return; }
+      if(counts[k] > 1) { counts[k]--; spots.push(i); }   // safe: a duplicate remains
+    });
+    for(let i=spots.length-1;i>0;i--){ const j=rand(i+1); [spots[i],spots[j]]=[spots[j],spots[i]]; }
+    for(const nw of missing){ if(spots.length) out[spots.pop()] = nw; }
+  }
+  return out.map(it=>({
+    code: it.code, shift: !!it.shift, space: !!it._space,
+    char: charOf(it.code, it.shift), disp: dispOf(it.code, it.shift)
+  }));
+}
+
+/* ---------- progress persistence ---------- */
+function loadProgress(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {best:{}}; } catch(e){ return {best:{}}; } }
+function saveProgress(p){ try { localStorage.setItem(STORE_KEY, JSON.stringify(p)); } catch(e){} }
+let progress = loadProgress();
+
+/* ============================================================
+   State
+   ============================================================ */
+let curIdx = null, pool = [], news = [], target = [], pos = 0, lineNo = 1;
+let started = false, startTime = 0, correct = 0, errors = 0;
+let ticker = null;
+let mode = 'drill', sentQueue = [], linesTotal = LINES_PER_LESSON;
+
+/* ============================================================
+   Keyboard rendering
+   ============================================================ */
+const ROWS = [
+  ['Backquote','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal',{label:'⌫',w:1.8}],
+  [{label:'Tab',w:1.6},'KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP','BracketLeft','BracketRight',{code:'Backslash',w:1.4}],
+  [{label:'Caps',w:1.9},'KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon','Quote',{label:'Enter',w:2.1}],
+  [{label:'Shift',w:2.4,role:'shiftL'},'KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash',{label:'Shift',w:2.7,role:'shiftR'}],
+  [{label:'Ctrl',w:1.5},{label:'Alt',w:1.5},{code:'Space',w:8},{label:'Alt',w:1.5},{label:'Ctrl',w:1.5}]
+];
+
+const keyEls = {};   // code -> element
+let shiftLeftEl = null, shiftRightEl = null;
+
+function buildKeyboard(){
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  for(const row of ROWS){
+    const rd = document.createElement('div'); rd.className = 'krow';
+    for(const item of row){
+      const el = document.createElement('div');
+      if(typeof item === 'string' || item.code){
+        const code = typeof item === 'string' ? item : item.code;
+        const k = L[code];
+        el.className = 'key';
+        if(k.home) el.classList.add('home');
+        if(item.w) el.style.setProperty('--w', item.w);
+        el.style.setProperty('--fg', FINGERS[k.f].rgb);
+        el.dataset.code = code;
+        const main = document.createElement('span'); main.className='k-main';
+        main.textContent = code==='Space' ? '' : k.b;
+        el.appendChild(main);
+        if(k.s && code!=='Space'){
+          const sh = document.createElement('span'); sh.className='k-shift';
+          sh.textContent = k.sd || k.s; el.appendChild(sh);
+        }
+        const lat = document.createElement('span'); lat.className='k-latin'; lat.textContent = k.latin;
+        el.appendChild(lat);
+        keyEls[code] = el;
+      } else {
+        el.className = 'key mod';
+        el.style.setProperty('--w', item.w || 1);
+        const lab = document.createElement('span'); lab.className='k-label'; lab.textContent = item.label;
+        el.appendChild(lab);
+        if(item.role==='shiftL') shiftLeftEl = el;
+        if(item.role==='shiftR') shiftRightEl = el;
+      }
+      rd.appendChild(el);
+    }
+    kb.appendChild(rd);
+  }
+  applyLatinVisibility();
+}
+
+function applyLatinVisibility(){
+  const show = document.getElementById('latinToggle').checked;
+  for(const code in keyEls) keyEls[code].classList.toggle('hide-latin', !show);
+}
+
+/* dim/active styling for the current lesson's pool */
+function styleLessonKeys(){
+  for(const code in keyEls){ keyEls[code].classList.remove('active'); keyEls[code].classList.add('dim'); }
+  if(curIdx === null) return;
+  for(const it of pool){
+    const el = keyEls[it.code];
+    if(el){ el.classList.add('active'); el.classList.remove('dim'); }
+  }
+  keyEls['Space'].classList.remove('dim');
+}
+
+function clearKeyHints(){
+  for(const code in keyEls) keyEls[code].classList.remove('next');
+  if(shiftLeftEl) shiftLeftEl.classList.remove('shiftnext');
+  if(shiftRightEl) shiftRightEl.classList.remove('shiftnext');
+}
+
+/* Letter names + sounds (romanized) from en.wikipedia.org/wiki/Arabic_alphabet
+   (ALA-LC romanization; alternative digraph forms kept where the article lists
+   them, e.g. "ṯ / th"). name = romanized name, ar = Arabic name, ipa = sound,
+   sound = romanization of the sound. Marks/punctuation carry a `note` instead. */
+const INFO = {
+  'ا':{name:'ʾalif', ar:'ألف', ipa:'/aː/, /ʔ/', sound:'ā, ʾ'},
+  'ب':{name:'bāʾ',  ar:'باء', ipa:'/b/', sound:'b'},
+  'ت':{name:'tāʾ',  ar:'تاء', ipa:'/t/', sound:'t'},
+  'ث':{name:'ṯāʾ',  ar:'ثاء', ipa:'/θ/', sound:'ṯ, th'},
+  'ج':{name:'jīm',  ar:'جيم', ipa:'/d͡ʒ/', sound:'j', eg:'Egyptian /ɡ/'},
+  'ح':{name:'ḥāʾ',  ar:'حاء', ipa:'/ħ/', sound:'ḥ'},
+  'خ':{name:'ḵāʾ',  ar:'خاء', ipa:'/x/', sound:'ḵ, kh'},
+  'د':{name:'dāl',  ar:'دال', ipa:'/d/', sound:'d'},
+  'ذ':{name:'ḏāl',  ar:'ذال', ipa:'/ð/', sound:'ḏ, dh'},
+  'ر':{name:'rāʾ',  ar:'راء', ipa:'/r/', sound:'r'},
+  'ز':{name:'zāy',  ar:'زاي', ipa:'/z/', sound:'z'},
+  'س':{name:'sīn',  ar:'سين', ipa:'/s/', sound:'s'},
+  'ش':{name:'šīn',  ar:'شين', ipa:'/ʃ/', sound:'š, sh'},
+  'ص':{name:'ṣād',  ar:'صاد', ipa:'/sˤ/', sound:'ṣ'},
+  'ض':{name:'ḍād',  ar:'ضاد', ipa:'/dˤ/', sound:'ḍ'},
+  'ط':{name:'ṭāʾ',  ar:'طاء', ipa:'/tˤ/', sound:'ṭ'},
+  'ظ':{name:'ẓāʾ',  ar:'ظاء', ipa:'/ðˤ/', sound:'ẓ'},
+  'ع':{name:'ʿayn', ar:'عين', ipa:'/ʕ/', sound:'ʿ'},
+  'غ':{name:'ġayn', ar:'غين', ipa:'/ɣ/', sound:'ḡ, gh'},
+  'ف':{name:'fāʾ',  ar:'فاء', ipa:'/f/', sound:'f'},
+  'ق':{name:'qāf',  ar:'قاف', ipa:'/q/', sound:'q', eg:'Egyptian /ʔ/'},
+  'ك':{name:'kāf',  ar:'كاف', ipa:'/k/', sound:'k'},
+  'ل':{name:'lām',  ar:'لام', ipa:'/l/', sound:'l'},
+  'م':{name:'mīm',  ar:'ميم', ipa:'/m/', sound:'m'},
+  'ن':{name:'nūn',  ar:'نون', ipa:'/n/', sound:'n'},
+  'ه':{name:'hāʾ',  ar:'هاء', ipa:'/h/', sound:'h'},
+  'و':{name:'wāw',  ar:'واو', ipa:'/w/, /uː/', sound:'w, ū'},
+  'ي':{name:'yāʾ',  ar:'ياء', ipa:'/j/, /iː/', sound:'y, ī'},
+  'ء':{name:'hamza', ar:'همزة', ipa:'/ʔ/', sound:'ʾ'},
+  'أ':{name:'hamza (above ʾalif)', ar:'ألف همزة', ipa:'/ʔ/', sound:'ʾ'},
+  'إ':{name:'hamza (below ʾalif)', ar:'ألف همزة', ipa:'/ʔ/', sound:'ʾ'},
+  'آ':{name:'ʾalif madda', ar:'ألف مدّة', ipa:'/ʔaː/', sound:'ʾā'},
+  'ؤ':{name:'hamza (on wāw)', ar:'واو همزة', ipa:'/ʔ/', sound:'ʾ'},
+  'ئ':{name:'hamza (on yāʾ)', ar:'ياء همزة', ipa:'/ʔ/', sound:'ʾ'},
+  'ة':{name:'tāʾ marbūṭa', ar:'تاء مربوطة', ipa:'/a/, /at/', sound:'a, t'},
+  'ى':{name:'ʾalif maqṣūra', ar:'ألف مقصورة', ipa:'/aː/', sound:'ā'},
+  'لا':{name:'lām-ʾalif', ar:'لام ألف', ipa:'/laː/', sound:'lā'},
+  'َ':{name:'fatḥa', ar:'فتحة', ipa:'/a/', sound:'a'},
+  'ُ':{name:'ḍamma', ar:'ضمّة', ipa:'/u/', sound:'u'},
+  'ِ':{name:'kasra', ar:'كسرة', ipa:'/i/', sound:'i'},
+  'ْ':{name:'sukūn', ar:'سكون', note:'no vowel (silent)'},
+  'ّ':{name:'šadda', ar:'شدّة', note:'doubles the consonant'},
+  'ً':{name:'fatḥatān · tanwīn', ar:'تنوين فتح', ipa:'/an/', sound:'an'},
+  'ٌ':{name:'ḍammatān · tanwīn', ar:'تنوين ضم', ipa:'/un/', sound:'un'},
+  'ٍ':{name:'kasratān · tanwīn', ar:'تنوين كسر', ipa:'/in/', sound:'in'},
+  'ـ':{name:'taṭwīl · kashīda', ar:'تطويل', note:'connector — no sound'},
+  '،':{name:'Arabic comma', ar:'فاصلة', note:'punctuation'},
+  '؛':{name:'Arabic semicolon', ar:'فاصلة منقوطة', note:'punctuation'},
+  '؟':{name:'Arabic question mark', ar:'علامة استفهام', note:'punctuation'}
+};
+
+function showLetterInfo(ch){
+  const box = document.getElementById('letterInfo');
+  const info = INFO[ch];
+  if(info){
+    const isMark = ch >= 'ً' && ch <= 'ْ';
+    const glyph = isMark ? '◌' + ch : ch;
+    let sound = info.ipa ? ('sound <b>'+info.ipa+'</b> · '+info.sound) : (info.note || '');
+    if(info.eg) sound += ' <span style="opacity:.8">('+info.eg+')</span>';
+    box.innerHTML =
+      '<span class="li-glyph">'+glyph+'</span>'+
+      '<span class="li-text">'+
+        '<span class="li-name"><b>'+info.name+'</b> · <span class="ar">'+info.ar+'</span></span>'+
+        '<span class="li-sound">'+sound+'</span>'+
+      '</span>';
+    box.classList.add('show');
+  } else if(ch === ' '){
+    box.innerHTML = '<span class="li-text"><span class="li-name">word space</span></span>';
+    box.classList.add('show');
+  } else {
+    box.classList.remove('show'); box.innerHTML = '';
+  }
+}
+
+function highlightNext(){
+  clearKeyHints();
+  if(pos >= target.length) return;
+  const cell = target[pos];
+  showLetterInfo(cell.char);
+  if(!cell.code){ document.getElementById('fingerHint').textContent = '—'; return; }
+  const el = keyEls[cell.code];
+  if(el) el.classList.add('next');
+  const k = L[cell.code];
+  // hand + finger hint
+  const fdot = document.getElementById('fingerDot');
+  const fhint = document.getElementById('fingerHint');
+  const fin = FINGERS[k.f];
+  fdot.style.background = 'rgb('+fin.rgb+')';
+  let txt = '<span class="finger-dot" id="fingerDot" style="background:rgb('+fin.rgb+')"></span>' + fin.name;
+  if(cell.shift){
+    const left = k.f.startsWith('l');
+    const sEl = left ? shiftRightEl : shiftLeftEl;     // use opposite-hand Shift
+    if(sEl) sEl.classList.add('shiftnext');
+    txt += ' + ' + (left ? 'right' : 'left') + ' Shift';
+  }
+  fhint.innerHTML = txt;
+}
+
+/* ============================================================
+   Lesson flow
+   ============================================================ */
+function buildMenu(){
+  const wrap = document.getElementById('lessons');
+  wrap.innerHTML = '';
+  LESSONS.forEach((lesson, i)=>{
+    const r = resolveLesson(i);
+    const btn = document.createElement('button');
+    btn.className = 'lesson-btn'; btn.dataset.idx = i;
+    const chips = lesson.type === 'sentence' ? 'متّصِل'
+                : (r.news.map(it=>dispOf(it.code, it.shift)).join(' ') || pool0Chips(i));
+    const best = progress.best[i];
+    btn.innerHTML =
+      '<span class="num">Lesson '+(i+1)+'</span>' +
+      '<span class="title">'+lesson.title+'</span>' +
+      '<span class="chips">'+chips+'</span>' +
+      (best ? '<span class="best">best '+best.wpm+' wpm · '+best.acc+'%</span>' : '') +
+      (best ? '<span class="done">✓</span>' : '');
+    btn.addEventListener('click', ()=>startLesson(i));
+    wrap.appendChild(btn);
+  });
+}
+function pool0Chips(i){ // review lessons with no new keys: show a few sample glyphs
+  const r = resolveLesson(i);
+  return r.pool.slice(0,6).map(it=>dispOf(it.code, it.shift)).join(' ');
+}
+
+function markCurrentMenu(){
+  document.querySelectorAll('.lesson-btn').forEach(b=>{
+    b.classList.toggle('current', Number(b.dataset.idx)===curIdx);
+  });
+}
+
+function startLesson(idx){
+  curIdx = idx;
+  const r = resolveLesson(idx);
+  pool = r.pool; news = r.news;
+  lineNo = 1; correct = 0; errors = 0; started = false; startTime = 0;
+  const lesson = LESSONS[idx];
+  mode = lesson.type === 'sentence' ? 'sentence' : 'drill';
+  linesTotal = mode === 'sentence' ? Math.min(LINES_PER_LESSON, lesson.sentences.length) : LINES_PER_LESSON;
+  sentQueue = mode === 'sentence' ? shuffle(lesson.sentences.slice()) : [];
+  document.getElementById('stNum').textContent = 'Lesson ' + (idx+1);
+  document.getElementById('stTitle').textContent = lesson.title;
+  document.getElementById('stKeys').textContent = mode === 'sentence' ? 'connected letter forms'
+        : (news.map(it=>dispOf(it.code, it.shift)).join('  ') || 'review');
+  document.getElementById('stage').classList.add('active');
+  applyKbVisibility();
+  styleLessonKeys();
+  markCurrentMenu();
+  newLine();
+  updateStats();
+  document.getElementById('stage').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function newLine(){
+  pos = 0;
+  if(mode === 'sentence'){
+    if(!sentQueue.length) sentQueue = shuffle(LESSONS[curIdx].sentences.slice());
+    target = buildSentenceTarget(sentQueue.pop());
+    renderSentence();
+  } else {
+    target = genLine(pool, news);
+    renderLine();
+  }
+  highlightNext();
+  document.getElementById('stLine').innerHTML = lineNo + '<span style="font-size:1rem">/'+linesTotal+'</span>';
+}
+
+function buildSentenceTarget(str){
+  const cells = [];
+  for(const ch of str){
+    const k = CHAR2KEY[ch];
+    cells.push({ char: ch, code: k ? k.code : null, shift: k ? k.shift : false, space: ch === ' ' });
+  }
+  return cells;
+}
+
+/* Joined rendering: three runs (done / current / rest). A ZWJ is appended/
+   prepended at each cut where the letters originally connected, so every run
+   shows the correct cursive form even though they are separate elements. */
+function renderSentence(){
+  const line = document.getElementById('line');
+  line.className = 'line sentence';
+  line.innerHTML = '';
+  const S = target.map(c=>c.char);
+  const ZWJ = '\u200D';
+  const dEl = document.createElement('span'); dEl.className = 's-done';
+  let dPart = S.slice(0, pos).join('');
+  if(pos < S.length){
+    const cur = S[pos];
+    let curPart = cur, rPart = S.slice(pos+1).join('');
+    if(pos > 0 && connects(S[pos-1], cur)){ dPart += ZWJ; curPart = ZWJ + curPart; }
+    if(pos+1 < S.length && connects(cur, S[pos+1])){ curPart += ZWJ; rPart = ZWJ + rPart; }
+    dEl.textContent = dPart;
+    const cEl = document.createElement('span'); cEl.className = 's-cur' + (cur === ' ' ? ' space' : '');
+    cEl.textContent = curPart;
+    const rEl = document.createElement('span'); rEl.className = 's-rest'; rEl.textContent = rPart;
+    line.appendChild(dEl); line.appendChild(cEl); line.appendChild(rEl);
+  } else {
+    dEl.textContent = dPart;
+    line.appendChild(dEl);
+  }
+  updateProgress();
+}
+
+function flashSentenceError(){
+  const cur = document.querySelector('#line .s-cur');
+  if(cur) cur.classList.add('err');
+  const line = document.getElementById('line');
+  line.classList.remove('shake'); void line.offsetWidth; line.classList.add('shake');
+}
+
+function applyKbVisibility(){
+  document.getElementById('stage').classList.toggle('hide-kb', !document.getElementById('kbToggle').checked);
+}
+
+function renderLine(){
+  const line = document.getElementById('line');
+  line.className = 'line';
+  line.innerHTML = '';
+  target.forEach((cell, i)=>{
+    const sp = document.createElement('span');
+    sp.className = 'cell' + (cell.space ? ' space':'');
+    sp.textContent = cell.disp;
+    if(i < pos) sp.classList.add('done');
+    if(i === pos) sp.classList.add('current');
+    line.appendChild(sp);
+    cell._el = sp;
+  });
+  updateProgress();
+}
+
+function updateProgress(){
+  const linePct = target.length ? pos/target.length : 0;
+  const overall = ((lineNo - 1) + linePct) / linesTotal;
+  document.getElementById('prog').style.width = (overall*100).toFixed(1) + '%';
+}
+
+/* ============================================================
+   Input handling
+   ============================================================ */
+function handleKey(e){
+  if(curIdx === null) return;
+  if(document.getElementById('overlay').classList.contains('show')) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;          // let browser shortcuts through
+  const code = e.code;
+  if(code==='ShiftLeft'||code==='ShiftRight'||code==='CapsLock'||code==='Tab') {
+    if(code==='Tab') e.preventDefault();
+    return;
+  }
+  if(!(code in L)) return;                                 // unmapped key: ignore
+  e.preventDefault();
+  if(pos >= target.length) return;                         // mid pause between lines
+
+  if(!started){ started = true; startTime = Date.now(); startTicker(); }
+
+  const produced = charOf(code, e.shiftKey);
+  const cell = target[pos];
+  const ok = produced === cell.char;
+
+  showLastKey(code, e.shiftKey, ok);
+
+  if(ok){
+    correct++;
+    if(mode === 'drill'){ cell._el.classList.remove('current','err'); cell._el.classList.add('done'); }
+    pos++;
+    if(pos >= target.length){
+      if(mode === 'sentence') renderSentence();
+      updateProgress();
+      lineNo++;
+      if(lineNo > linesTotal){ finishLesson(); return; }
+      setTimeout(newLine, 220);
+    } else {
+      if(mode === 'drill') target[pos]._el.classList.add('current');
+      else renderSentence();
+      highlightNext();
+      updateProgress();
+    }
+  } else {
+    errors++;
+    if(mode === 'drill'){ cell._el.classList.remove('err'); void cell._el.offsetWidth; cell._el.classList.add('err'); }
+    else flashSentenceError();
+  }
+  updateStats();
+}
+
+function showLastKey(code, shift, ok){
+  const k = L[code];
+  const glyph = code==='Space' ? '␣' : dispOf(code, shift);
+  const el = document.getElementById('lastKey');
+  el.className = 'lastkey ' + (ok ? 'ok':'bad');
+  el.innerHTML = (shift?'Shift + ':'') + k.latin + ' → <b>'+glyph+'</b> ' + (ok?'✓':'✗');
+}
+
+function updateStats(){
+  const mins = started ? Math.max((Date.now()-startTime)/60000, 1/600) : 0;
+  const wpm = started ? Math.round((correct/5)/mins) : 0;
+  const total = correct + errors;
+  const acc = total ? Math.round(correct/total*100) : 100;
+  document.getElementById('stWpm').textContent = wpm;
+  document.getElementById('stAcc').innerHTML = acc + '<span style="font-size:.9rem">%</span>';
+}
+
+function startTicker(){ stopTicker(); ticker = setInterval(updateStats, 400); }
+function stopTicker(){ if(ticker){ clearInterval(ticker); ticker = null; } }
+
+/* ============================================================
+   Completion
+   ============================================================ */
+function finishLesson(){
+  stopTicker();
+  const secs = (Date.now()-startTime)/1000;
+  const mins = Math.max(secs/60, 1/600);
+  const wpm = Math.round((correct/5)/mins);
+  const total = correct + errors;
+  const acc = total ? Math.round(correct/total*100) : 100;
+
+  const prev = progress.best[curIdx];
+  if(!prev || wpm > prev.wpm) progress.best[curIdx] = {wpm, acc};
+  saveProgress(progress);
+
+  document.getElementById('mWpm').textContent = wpm;
+  document.getElementById('mAcc').textContent = acc + '%';
+  document.getElementById('mTime').textContent = secs<60 ? Math.round(secs)+'s' : Math.floor(secs/60)+'m '+Math.round(secs%60)+'s';
+  document.getElementById('mTitle').textContent = LESSONS[curIdx].title + ' — done';
+  document.getElementById('mNext').style.display = (curIdx < LESSONS.length-1) ? '' : 'none';
+  document.getElementById('overlay').classList.add('show');
+  buildMenu(); markCurrentMenu();
+}
+
+/* ============================================================
+   Wiring
+   ============================================================ */
+buildKeyboard();
+buildMenu();
+window.addEventListener('keydown', handleKey);
+
+// restore + persist display preferences
+if(progress.prefs){
+  document.getElementById('kbToggle').checked = progress.prefs.kb !== false;
+  document.getElementById('latinToggle').checked = progress.prefs.latin !== false;
+}
+applyLatinVisibility();
+function savePrefs(){
+  progress.prefs = { kb: document.getElementById('kbToggle').checked, latin: document.getElementById('latinToggle').checked };
+  saveProgress(progress);
+}
+document.getElementById('kbToggle').addEventListener('change', ()=>{ savePrefs(); applyKbVisibility(); highlightNext(); });
+document.getElementById('latinToggle').addEventListener('change', ()=>{ savePrefs(); applyLatinVisibility(); });
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Reset all saved progress?')){ progress = {best:{}}; saveProgress(progress); buildMenu(); markCurrentMenu(); }
+});
+document.getElementById('mRepeat').addEventListener('click', ()=>{ closeModal(); startLesson(curIdx); });
+document.getElementById('mMenu').addEventListener('click', ()=>{ closeModal(); document.querySelector('header').scrollIntoView({behavior:'smooth'}); });
+document.getElementById('mNext').addEventListener('click', ()=>{ closeModal(); if(curIdx < LESSONS.length-1) startLesson(curIdx+1); });
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+
+/* finger legend */
+(function(){
+  const order = ['lp','lr','lm','li','ri','rm','rr','rp'];
+  const leg = document.getElementById('legend');
+  leg.innerHTML = order.map(f=>'<span><i style="background:rgb('+FINGERS[f].rgb+')"></i>'+FINGERS[f].name+'</span>').join('');
+})();
+</script>
+</body>
+</html>
