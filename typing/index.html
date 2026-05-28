@@ -157,12 +157,13 @@ h1 { font-family: 'Noto Naskh Arabic', serif; font-weight: 500; font-size: 2.1re
 .toggle { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
 
 /* ---- Controls + sentence (joined) mode ---- */
-.controls { display: flex; justify-content: flex-end; align-items: center; margin-bottom: .55rem; font-size: .8rem; color: var(--ink-soft); }
+.controls { display: flex; justify-content: flex-end; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: .55rem; font-size: .8rem; color: var(--ink-soft); }
 .controls .toggle { user-select: none; }
 .stage.hide-kb #keyboard,
 .stage.hide-kb .kbfoot,
 .stage.hide-kb .tip,
 .stage.hide-kb #fingerHint { display: none; }
+.stage.hide-li #letterInfo { display: none; }
 
 .line.sentence { direction: rtl; display: block; text-align: center; font-family: 'Noto Naskh Arabic', serif; font-size: clamp(1.6rem, 4.6vw, 2.3rem); line-height: 1.8; }
 .line.sentence .s-done { color: var(--correct); }
@@ -227,6 +228,7 @@ h1 { font-family: 'Noto Naskh Arabic', serif; font-weight: 500; font-size: 2.1re
     </div>
 
     <div class="controls">
+      <label class="toggle"><input type="checkbox" id="liToggle" checked> show letter guide</label>
       <label class="toggle"><input type="checkbox" id="kbToggle" checked> show keyboard &amp; finger guide</label>
     </div>
 
@@ -277,19 +279,21 @@ h1 { font-family: 'Noto Naskh Arabic', serif; font-weight: 500; font-size: 2.1re
    For each key: base (no shift), shift (shifted glyph), finger, latin label.
    `sd` = display override for combining marks (shown on a dotted circle ◌).
    ============================================================ */
-const DC = '◌'; // dotted circle carrier for harakat
+const DC = 'ـ'; // tatweel (kashida) carrier — same Arabic font as the marks, so
+                // harakat/tanwin/sukun/shadda compose correctly (the dotted circle
+                // ◌ comes from a fallback font and the marks fail to attach to it)
 const L = {
   Backquote:{b:'ذ', s:'ّ', sd:DC+'ّ', f:'lp', latin:'`'},   // shadda
-  Digit1:{b:'1', s:'!', f:'lp', latin:'1'},
-  Digit2:{b:'2', s:'@', f:'lr', latin:'2'},
-  Digit3:{b:'3', s:'#', f:'lm', latin:'3'},
-  Digit4:{b:'4', s:'$', f:'li', latin:'4'},
-  Digit5:{b:'5', s:'%', f:'li', latin:'5'},
-  Digit6:{b:'6', s:'^', f:'ri', latin:'6'},
-  Digit7:{b:'7', s:'&', f:'ri', latin:'7'},
-  Digit8:{b:'8', s:'*', f:'rm', latin:'8'},
-  Digit9:{b:'9', s:')', f:'rr', latin:'9'},
-  Digit0:{b:'0', s:'(', f:'rp', latin:'0'},
+  Digit1:{b:'١', s:'!', f:'lp', latin:'1'},
+  Digit2:{b:'٢', s:'@', f:'lr', latin:'2'},
+  Digit3:{b:'٣', s:'#', f:'lm', latin:'3'},
+  Digit4:{b:'٤', s:'$', f:'li', latin:'4'},
+  Digit5:{b:'٥', s:'%', f:'li', latin:'5'},
+  Digit6:{b:'٦', s:'^', f:'ri', latin:'6'},
+  Digit7:{b:'٧', s:'&', f:'ri', latin:'7'},
+  Digit8:{b:'٨', s:'*', f:'rm', latin:'8'},
+  Digit9:{b:'٩', s:')', f:'rr', latin:'9'},
+  Digit0:{b:'٠', s:'(', f:'rp', latin:'0'},
   Minus:{b:'-', s:'_', f:'rp', latin:'-'},
   Equal:{b:'=', s:'+', f:'rp', latin:'='},
 
@@ -363,10 +367,6 @@ const LESSONS = [
   {title:'Bottom Row · Reaches',   add:['KeyB','Slash']},
   {title:'The Last Letters',       add:['BracketLeft','BracketRight','Backquote']},
   {title:'Full Alphabet Review',   add:[]},
-  {title:'Hamza Forms', type:'shift', items:[
-      {code:'KeyH',shift:true,new:true},{code:'KeyY',shift:true,new:true},{code:'KeyN',shift:true,new:true},
-      {code:'KeyG',shift:true,new:true},{code:'KeyT',shift:true,new:true},{code:'KeyB',shift:true,new:true},
-      {code:'KeyH'},{code:'KeyL'},{code:'KeyD'} ]},
   {title:'Egyptian Arabic Sentences', type:'sentence', sentences:[
       'إزيك عامل إيه النهارده',
       'أنا رايح الشغل بدري',
@@ -380,6 +380,10 @@ const LESSONS = [
       'القطر هيوصل بعد شوية',
       'عايز أشرب شاي بالنعناع',
       'البنت دي شاطرة في المدرسة' ]},
+  {title:'Hamza Forms', type:'shift', items:[
+      {code:'KeyH',shift:true,new:true},{code:'KeyY',shift:true,new:true},{code:'KeyN',shift:true,new:true},
+      {code:'KeyG',shift:true,new:true},{code:'KeyT',shift:true,new:true},{code:'KeyB',shift:true,new:true},
+      {code:'KeyH'},{code:'KeyL'},{code:'KeyD'} ]},
   {title:'Short Vowels · Harakat', type:'shift', items:[
       {code:'KeyQ',shift:true,new:true},{code:'KeyE',shift:true,new:true},{code:'KeyA',shift:true,new:true},
       {code:'KeyF'},{code:'KeyJ'},{code:'KeyK'},{code:'KeyL'},{code:'KeyG'},{code:'KeyH'},{code:'KeyV'} ]},
@@ -390,7 +394,7 @@ const LESSONS = [
   {title:'Punctuation & Tatweel', type:'shift', items:[
       {code:'KeyK',shift:true,new:true},{code:'KeyP',shift:true,new:true},{code:'Slash',shift:true,new:true},{code:'KeyJ',shift:true,new:true},
       {code:'KeyL'},{code:'KeyG'},{code:'KeyH'},{code:'KeyF'},{code:'KeyV'} ]},
-  {title:'The Number Row', type:'num', items:[
+  {title:'Eastern Arabic Numerals', type:'num', items:[
       {code:'Digit1',new:true},{code:'Digit2',new:true},{code:'Digit3',new:true},{code:'Digit4',new:true},{code:'Digit5',new:true},
       {code:'Digit6',new:true},{code:'Digit7',new:true},{code:'Digit8',new:true},{code:'Digit9',new:true},{code:'Digit0',new:true} ]}
 ];
@@ -638,7 +642,7 @@ function showLetterInfo(ch){
   const info = INFO[ch];
   if(info){
     const isMark = ch >= 'ً' && ch <= 'ْ';
-    const glyph = isMark ? '◌' + ch : ch;
+    const glyph = isMark ? DC + ch : ch;
     let sound = info.ipa ? ('sound <b>'+info.ipa+'</b> · '+info.sound) : (info.note || '');
     if(info.eg) sound += ' <span style="opacity:.8">('+info.eg+')</span>';
     box.innerHTML =
@@ -729,6 +733,7 @@ function startLesson(idx){
         : (news.map(it=>dispOf(it.code, it.shift)).join('  ') || 'review');
   document.getElementById('stage').classList.add('active');
   applyKbVisibility();
+  applyLiVisibility();
   styleLessonKeys();
   markCurrentMenu();
   newLine();
@@ -796,6 +801,10 @@ function flashSentenceError(){
 
 function applyKbVisibility(){
   document.getElementById('stage').classList.toggle('hide-kb', !document.getElementById('kbToggle').checked);
+}
+
+function applyLiVisibility(){
+  document.getElementById('stage').classList.toggle('hide-li', !document.getElementById('liToggle').checked);
 }
 
 function renderLine(){
@@ -922,14 +931,20 @@ window.addEventListener('keydown', handleKey);
 // restore + persist display preferences
 if(progress.prefs){
   document.getElementById('kbToggle').checked = progress.prefs.kb !== false;
+  document.getElementById('liToggle').checked = progress.prefs.li !== false;
   document.getElementById('latinToggle').checked = progress.prefs.latin !== false;
 }
 applyLatinVisibility();
 function savePrefs(){
-  progress.prefs = { kb: document.getElementById('kbToggle').checked, latin: document.getElementById('latinToggle').checked };
+  progress.prefs = {
+    kb: document.getElementById('kbToggle').checked,
+    li: document.getElementById('liToggle').checked,
+    latin: document.getElementById('latinToggle').checked
+  };
   saveProgress(progress);
 }
 document.getElementById('kbToggle').addEventListener('change', ()=>{ savePrefs(); applyKbVisibility(); highlightNext(); });
+document.getElementById('liToggle').addEventListener('change', ()=>{ savePrefs(); applyLiVisibility(); });
 document.getElementById('latinToggle').addEventListener('change', ()=>{ savePrefs(); applyLatinVisibility(); });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   if(confirm('Reset all saved progress?')){ progress = {best:{}}; saveProgress(progress); buildMenu(); markCurrentMenu(); }
